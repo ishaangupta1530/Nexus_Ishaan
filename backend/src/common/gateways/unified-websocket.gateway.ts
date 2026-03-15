@@ -145,6 +145,12 @@ export class UnifiedWebSocketGateway
   private initializeRedis(): void {
     const redisUrl = this.configService.get('REDIS_URL');
 
+    // Skip Redis initialization if not configured
+    if (!redisUrl || redisUrl.trim() === '') {
+      this.logger.warn('⚠️ Redis not configured - WebSocket will operate in single-server mode');
+      return;
+    }
+
     // Main Redis connection
     this.redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,

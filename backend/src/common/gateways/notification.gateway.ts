@@ -83,6 +83,13 @@ export class NotificationGateway
 
   private initializeRedis(): void {
     const redisUrl = this.configService.get('REDIS_URL');
+    
+    // Skip Redis initialization if not configured
+    if (!redisUrl || redisUrl.trim() === '') {
+      this.logger.warn('⚠️ Notification Gateway: Redis not configured - single-server mode');
+      return;
+    }
+    
     this.redis = new Redis(redisUrl);
 
     this.redis.on('connect', () => {

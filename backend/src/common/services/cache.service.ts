@@ -26,7 +26,7 @@ export class CacheService {
   constructor(private configService: ConfigService) {
     const redisUrl = this.configService.get<string>('REDIS_URL');
 
-    if (redisUrl) {
+    if (redisUrl && redisUrl.trim() !== '') {
       // Cloud Redis (production)
       this.redis = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
@@ -39,8 +39,9 @@ export class CacheService {
         lazyConnect: false,
       });
     } else {
-      // Local Redis (development)
-      this.redis = new Redis(this.configService.get<string>('REDIS_URL'));
+      // Local development without Redis - create mock client
+      this.logger.warn('⚠️ Redis not configured - using mock cache client');
+      this.redis = this.createMockRedisClient();
     }
 
     this.redis.on('connect', () => {
@@ -503,6 +504,35 @@ export class CacheService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Create a mock Redis client for development without actual Redis
+   */
+  private createMockRedisClient(): any {
+    return {
+      get: async () => null,
+      set: async () => 'OK',
+      setex: async () => 'OK',
+      del: async () => 0,
+      exists: async () => 0,
+      expire: async () => 0,
+      ttl: async () => -1,
+      incr: async () => 1,
+      decr: async () => 0,
+      keys: async () => [],
+      sadd: async () => 0,
+      srem: async () => 0,
+      smembers: async () => [],
+      sismember: async () => 0,
+      scard: async () => 0,
+      hset: async () => 0,
+      hget: async () => null,
+      hgetall: async () => ({}),
+      hdel: async () => 0,
+      on: () => {},
+      quit: async () => {},
+    };
   }
 
   /**

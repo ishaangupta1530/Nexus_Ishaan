@@ -73,10 +73,12 @@ export class FastChatGateway
   ) {
     // Initialize Redis connection
     const redisUrl = this.configService.get('REDIS_URL');
-    if (redisUrl) {
+    if (redisUrl && redisUrl.trim() !== '') {
       this.redis = new Redis(redisUrl);
     } else {
-      this.redis = new Redis(this.configService.get('REDIS_URL'));
+      this.logger.warn('⚠️ Redis not configured - FastChat will operate in single-server mode');
+      // Create a no-op mock client
+      this.redis = this.createMockRedisClient();
     }
 
     this.redis.on('connect', () => {
@@ -86,6 +88,15 @@ export class FastChatGateway
     this.redis.on('error', (err) => {
       this.logger.error('❌ Redis connection error:', err);
     });
+  }
+
+  private createMockRedisClient(): any {
+    return {
+      publish: async () => 0,
+      subscribe: async () => {},
+      unsubscribe: async () => {},
+      on: () => {},
+    };
   }
 
   afterInit() {

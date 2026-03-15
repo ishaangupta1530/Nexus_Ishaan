@@ -25,7 +25,7 @@ export class CacheEnhancedService implements OnModuleInit {
     try {
       // Initialize Redis connection
       const redisUrl = this.configService.get<string>('REDIS_URL');
-      if (redisUrl) {
+      if (redisUrl && redisUrl.trim() !== '') {
         this.redis = new Redis(redisUrl, {
           maxRetriesPerRequest: 3,
           retryStrategy: (times) => {
@@ -43,6 +43,7 @@ export class CacheEnhancedService implements OnModuleInit {
         });
       } else {
         this.logger.warn('Redis URL not configured, using local cache only');
+        this.redis = this.createMockRedisClient();
       }
     } catch (error) {
       this.logger.error('Failed to initialize Redis:', error);
@@ -259,6 +260,21 @@ export class CacheEnhancedService implements OnModuleInit {
     return {
       localCacheSize: this.localCache.size,
       redisConnected: this.redis?.status === 'ready',
+    };
+  }
+
+  /**
+   * Create a mock Redis client for development without actual Redis
+   */
+  private createMockRedisClient(): any {
+    return {
+      get: async () => null,
+      set: async () => 'OK',
+      del: async () => 0,
+      exists: async () => 0,
+      expire: async () => 0,
+      ttl: async () => -1,
+      on: () => {},
     };
   }
 }

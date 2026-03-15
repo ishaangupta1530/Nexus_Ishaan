@@ -48,7 +48,8 @@ export const envValidationSchema = Joi.object({
 
   // ─── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: Joi.string()
-    .required()
+    .allow('')
+    .optional()
     .description('Redis connection URL, e.g. redis://localhost:6379'),
 
   REDIS_TTL: Joi.number().integer().positive().default(3600),

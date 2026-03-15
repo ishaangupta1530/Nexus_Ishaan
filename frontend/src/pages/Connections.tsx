@@ -58,6 +58,7 @@ import type {
 import { apiService } from '../services/api';
 import { LocationOn, School, Email } from '@mui/icons-material';
 import { useNotification } from '@/contexts/NotificationContext';
+import ExportButton from '../components/Export/ExportButton';
 
 const Connections: FC = () => {
   const navigate = useNavigate();
@@ -481,15 +482,22 @@ const Connections: FC = () => {
             Manage and grow your professional network
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={connectionsLoading}
-          sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
-        >
-          Refresh
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <ExportButton
+            exportType="CONNECTIONS"
+            pageTitle="Connections"
+            isCompact
+          />
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={connectionsLoading}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+          >
+            Refresh
+          </Button>
+        </Stack>
 
         {/* Stats Cards */}
         {stats && (

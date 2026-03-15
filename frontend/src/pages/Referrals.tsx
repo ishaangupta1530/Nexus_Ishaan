@@ -43,6 +43,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { motion } from 'framer-motion';
 import { apiService } from '../services/api';
+import ExportButton from '../components/Export/ExportButton';
 
 interface Referral {
   id: string;
@@ -746,6 +747,13 @@ const Referrals: FC = () => {
               Last updated: {lastRefreshedAt}
             </Typography>
           )}
+
+          <ExportButton
+            exportType="REFERRALS"
+            pageTitle="Referrals"
+            filters={{ status: filterStatus !== 'ALL' ? filterStatus : undefined }}
+            isCompact
+          />
 
           {(user?.role === 'ALUM' || user?.role === 'ADMIN') && (
             <Button

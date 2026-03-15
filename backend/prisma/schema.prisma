@@ -93,6 +93,8 @@ model User {
   communityFollowers                    CommunityFollow[]             @relation("CommunityFollowFollowed")
   memberFlairs                          MemberFlair[]
   notificationPreference                NotificationPreference?
+  exportJobs                            ExportJob[]               @relation("UserExportJobs")
+  scheduledReports                      ScheduledReport[]         @relation("UserScheduledReports")
 
   @@map("users")
 }
@@ -1247,4 +1249,69 @@ enum ModerationActionType {
   USER_ACTION_TAKEN
   USER_ACTION_REVERTED
   BATCH_OPERATION
+}
+
+// ============================================
+// EXPORT & REPORTING SYSTEM
+// ============================================
+
+model ExportJob {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserExportJobs", fields: [userId], references: [id], onDelete: Cascade)
+  exportType String   // ANALYTICS, REFERRALS, CONNECTIONS, CUSTOM
+  format    String   // CSV, PDF, EXCEL, JSON
+  filters   Json?    // Export parameters
+  status    String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  fileUrl   String?
+  fileSize  Int?
+  expiresAt DateTime?
+  error     String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  sharedExports SharedExport[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@map("export_jobs")
+}
+
+model ScheduledReport {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserScheduledReports", fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  reportType String  // ANALYTICS_SUMMARY, REFERRAL_REPORT, CONNECTIONS_REPORT
+  format    String   // CSV, PDF, EXCEL, JSON
+  schedule  String   // Cron expression
+  filters   Json?
+  recipients String[]
+  enabled   Boolean  @default(true)
+  lastRunAt DateTime?
+  nextRunAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, enabled, nextRunAt])
+  @@index([nextRunAt])
+  @@map("scheduled_reports")
+}
+
+model SharedExport {
+  id           String   @id @default(cuid())
+  exportJobId  String
+  exportJob    ExportJob @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+  shareToken   String   @unique @db.VarChar(255)
+  password     String?  // Hashed with bcrypt
+  expiresAt    DateTime?
+  maxViews     Int?
+  viewCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  accessLog    Json[]   @default([]) // [{accessedAt: ISO, ip: string, userAgent: string}]
+  
+  @@index([shareToken])
+  @@index([exportJobId])
+  @@index([expiresAt])
+  @@map("shared_exports")
 }

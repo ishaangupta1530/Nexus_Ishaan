@@ -31,14 +31,17 @@ export class RedisIoAdapter extends IoAdapter {
   async connectToRedis(): Promise<void> {
     const redisUrl = this.configService.get('REDIS_URL');
 
+    // Skip Redis initialization if not configured
+    if (!redisUrl || redisUrl.trim() === '') {
+      this.logger.warn('⚠️ Redis not configured - using in-memory Socket.IO adapter');
+      return;
+    }
+
     this.logger.log('🔌 Connecting to Redis for Socket.IO adapter...');
 
     try {
       // Create Redis clients for pub/sub
-      const pubClient = redisUrl
-        ? createClient({ url: redisUrl })
-        : createClient();
-
+      const pubClient = createClient({ url: redisUrl });
       const subClient = pubClient.duplicate();
 
       // Handle connection events

@@ -393,6 +393,29 @@ export const apiService = {
     deleteAllRead: () => api.delete('/notifications/read/all'),
     deleteAll: () => api.delete('/notifications/all'),
   },
+
+  // Export endpoints
+  export: {
+    request: (data: {
+      type: 'ANALYTICS' | 'REFERRALS' | 'CONNECTIONS' | 'CUSTOM';
+      format: 'CSV' | 'PDF' | 'EXCEL' | 'JSON';
+      filters?: Record<string, any>;
+    }) => api.post('/export/request', data),
+    
+    getStatus: (jobId: string) =>
+      api.get(`/export/status/${jobId}`),
+    
+    download: (jobId: string) =>
+      api.get(`/export/download/${jobId}`, {
+        responseType: 'arraybuffer',
+      }),
+    
+    getHistory: (params?: { skip?: number; take?: number }) =>
+      api.get('/export/history', { params }),
+    
+    delete: (jobId: string) =>
+      api.delete(`/export/${jobId}`),
+  },
 };
 
 // Error handling utility

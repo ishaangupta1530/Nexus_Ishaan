@@ -98,6 +98,13 @@ export class PresenceService {
    */
   private initializeRedis(): void {
     const redisUrl = this.configService.get('REDIS_URL');
+    
+    // Skip Redis initialization if not configured
+    if (!redisUrl || redisUrl.trim() === '') {
+      this.logger.warn('⚠️ Presence Service: Redis not configured - single-server mode');
+      return;
+    }
+    
     this.redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,

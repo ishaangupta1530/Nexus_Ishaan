@@ -20,6 +20,7 @@ import referralAnalyticsService, {
   type FunnelStage,
   type TrendBucket,
 } from '../services/referralAnalyticsService';
+import ExportButton from '../components/Export/ExportButton';
 
 // Lazy load dashboard components to split recharts into separate chunk
 const AdminDashboard = lazy(() => import('./ReferralAnalytics/AdminDashboard'));
@@ -115,10 +116,17 @@ const ReferralAnalytics: FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          <Assessment sx={{ mr: 1, verticalAlign: 'bottom' }} />
-          Referral Analytics Dashboard
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Typography variant="h4" fontWeight="bold">
+            <Assessment sx={{ mr: 1, verticalAlign: 'bottom' }} />
+            Referral Analytics Dashboard
+          </Typography>
+          <ExportButton
+            exportType="ANALYTICS"
+            pageTitle="Referral Analytics"
+            isCompact
+          />
+        </Box>
       </motion.div>
 
       {error && (
