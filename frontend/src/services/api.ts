@@ -399,7 +399,7 @@ export const apiService = {
     request: (data: {
       type: 'ANALYTICS' | 'REFERRALS' | 'CONNECTIONS' | 'CUSTOM';
       format: 'CSV' | 'PDF' | 'EXCEL' | 'JSON';
-      filters?: Record<string, any>;
+      filters?: Record<string, unknown>;
     }) => api.post('/export/request', data),
     
     getStatus: (jobId: string) =>

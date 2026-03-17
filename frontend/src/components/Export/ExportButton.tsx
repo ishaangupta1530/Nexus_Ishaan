@@ -28,7 +28,7 @@ import { apiService } from '@/services/api';
 interface ExportButtonProps {
   exportType: 'ANALYTICS' | 'REFERRALS' | 'CONNECTIONS' | 'CUSTOM';
   pageTitle?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   isCompact?: boolean; // For mobile-friendly compact button
 }
 
@@ -88,11 +88,9 @@ const ExportButton: FC<ExportButtonProps> = ({
 
       // Poll for status
       await pollExportStatus(jobId);
-    } catch (error: any) {
-      showNotification?.(
-        error?.response?.data?.message || 'Failed to start export',
-        'error'
-      );
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to start export';
+      showNotification?.(message, 'error');
       setExporting(false);
     }
   };
@@ -131,7 +129,7 @@ const ExportButton: FC<ExportButtonProps> = ({
         // Continue polling
         setTimeout(() => pollExportStatus(jobId, attempts + 1), 1000);
       }
-    } catch (error: any) {
+    } catch (_error) {
       showNotification?.('Failed to check export status', 'error');
       setExporting(false);
     }
@@ -166,11 +164,9 @@ const ExportButton: FC<ExportButtonProps> = ({
 
       showNotification?.('Export downloaded successfully!', 'success');
       handleCloseDialog();
-    } catch (error: any) {
-      showNotification?.(
-        error?.response?.data?.message || 'Failed to download export',
-        'error'
-      );
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to download export';
+      showNotification?.(message, 'error');
     }
   };
 
@@ -275,7 +271,7 @@ const ExportButton: FC<ExportButtonProps> = ({
                 <InputLabel>Export Format</InputLabel>
                 <Select
                   value={format}
-                  onChange={(e) => setFormat(e.target.value as any)}
+                  onChange={(e) => setFormat(e.target.value)}
                   label="Export Format"
                 >
                   {formatOptions.map((option) => (
