@@ -10,46 +10,52 @@ import { JsonGenerator } from '../export/generators/json.generator';
 import { ExcelGenerator } from '../export/generators/excel.generator';
 import { PdfGenerator } from '../export/generators/pdf.generator';
 
+const disableRedis = process.env.DISABLE_REDIS === 'true';
+
+// Only include BullModule if Redis is enabled
+const bullModuleImports = disableRedis
+  ? []
+  : [
+      BullModule.registerQueue(
+        {
+          name: EXPORT_QUEUE_NAME,
+          connection: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+            password: process.env.REDIS_PASSWORD,
+          },
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+            removeOnComplete: {
+              age: 3600,
+            },
+            removeOnFail: false,
+          },
+        },
+        {
+          name: REPORTS_QUEUE_NAME,
+          connection: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+            password: process.env.REDIS_PASSWORD,
+          },
+          defaultJobOptions: {
+            attempts: 2,
+            backoff: {
+              type: 'exponential',
+              delay: 3000,
+            },
+          },
+        },
+      ),
+    ];
+
 @Module({
-  imports: [
-    PrismaModule,
-    BullModule.registerQueue(
-      {
-        name: EXPORT_QUEUE_NAME,
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379', 10),
-          password: process.env.REDIS_PASSWORD,
-        },
-        defaultJobOptions: {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-          removeOnComplete: {
-            age: 3600,
-          },
-          removeOnFail: false,
-        },
-      },
-      {
-        name: REPORTS_QUEUE_NAME,
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379', 10),
-          password: process.env.REDIS_PASSWORD,
-        },
-        defaultJobOptions: {
-          attempts: 2,
-          backoff: {
-            type: 'exponential',
-            delay: 3000,
-          },
-        },
-      },
-    ),
-  ],
+  imports: [PrismaModule, ...bullModuleImports],
   providers: [
     ExportProcessor,
     ReportsProcessor,

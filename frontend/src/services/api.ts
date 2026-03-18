@@ -88,9 +88,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as
-      | (AxiosError['config'] & { _retry?: boolean })
-      | undefined;
+    const originalRequest = error.config;
     const status = error.response?.status;
     const requestUrl = originalRequest?.url ?? 'unknown';
     const method = (originalRequest?.method ?? 'get').toUpperCase();
@@ -142,8 +140,8 @@ api.interceptors.response.use(
 
       localStorage.removeItem('user');
       setApiAccessToken(null);
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (globalThis.location.pathname !== '/login') {
+        globalThis.location.href = '/login';
       }
     }
 
@@ -315,18 +313,30 @@ export const apiService = {
   // Files endpoints
   files: {
     upload: (formData: FormData) => api.post('/files/upload', formData),
-    getAll: (accessToken?: string, refreshToken?: string) =>
-      api.get(
-        `/files${accessToken ? `?access_token=${accessToken}${refreshToken ? `&refresh_token=${refreshToken}` : ''}` : ''}`
-      ),
+    getAll: (accessToken?: string, refreshToken?: string) => {
+      let query = '';
+      if (accessToken) {
+        query = `?access_token=${accessToken}`;
+        if (refreshToken) {
+          query += `&refresh_token=${refreshToken}`;
+        }
+      }
+      return api.get(`/files${query}`);
+    },
     getById: (id: string) => api.get(`/files/${id}`),
     delete: (id: string, body?: unknown) =>
       api.delete(`/files/${id}`, { data: body }),
     download: (id: string) => api.get(`/files/${id}/download`),
-    getDownloadUrl: (id: string, accessToken: string, refreshToken?: string) =>
-      api.get(
-        `/files/${id}/download?access_token=${accessToken}${refreshToken ? `&refresh_token=${refreshToken}` : ''}`
-      ),
+    getDownloadUrl: (
+      id: string,
+      accessToken: string,
+      refreshToken?: string
+    ) => {
+      const query = refreshToken ? `&refresh_token=${refreshToken}` : '';
+      return api.get(
+        `/files/${id}/download?access_token=${accessToken}${query}`
+      );
+    },
     share: (
       id: string,
       userEmail: string,
@@ -401,25 +411,23 @@ export const apiService = {
       format: 'CSV' | 'PDF' | 'EXCEL' | 'JSON';
       filters?: Record<string, unknown>;
     }) => api.post('/export/request', data),
-    
-    getStatus: (jobId: string) =>
-      api.get(`/export/status/${jobId}`),
-    
+
+    getStatus: (jobId: string) => api.get(`/export/status/${jobId}`),
+
     download: (jobId: string) =>
       api.get(`/export/download/${jobId}`, {
         responseType: 'arraybuffer',
       }),
-    
+
     getHistory: (params?: { skip?: number; take?: number }) =>
       api.get('/export/history', { params }),
-    
-    delete: (jobId: string) =>
-      api.delete(`/export/${jobId}`),
+
+    delete: (jobId: string) => api.delete(`/export/${jobId}`),
   },
 };
 
 // Error handling utility
-export const handleApiError = (error: AxiosError | Error | unknown): string => {
+export const handleApiError = (error: unknown): string => {
   if (
     error &&
     typeof error === 'object' &&

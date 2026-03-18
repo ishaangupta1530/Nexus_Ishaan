@@ -17,7 +17,7 @@ const logger = new Logger('BullConfig');
 export function createRedisConnection(options: BullConfigOptions = {}) {
   return {
     host: options.host || process.env.REDIS_HOST || 'localhost',
-    port: options.port || parseInt(process.env.REDIS_PORT || '6379', 10),
+    port: options.port || Number.parseInt(process.env.REDIS_PORT || '6379', 10),
     password: options.password || process.env.REDIS_PASSWORD || undefined,
     db: options.db || 0,
     maxRetriesPerRequest: options.maxRetriesPerRequest ?? null,
@@ -27,11 +27,14 @@ export function createRedisConnection(options: BullConfigOptions = {}) {
 /**
  * Create and configure a Bull Queue
  */
-export function createQueue<T>(queueName: string, options: BullConfigOptions = {}): Queue<T> {
+export function createQueue(
+  queueName: string,
+  options: BullConfigOptions = {},
+): Queue {
   try {
     const connection = createRedisConnection(options);
 
-    const queue = new Queue<T>(queueName, {
+    const queue = new Queue(queueName, {
       connection,
       defaultJobOptions: {
         attempts: 3,
@@ -40,7 +43,7 @@ export function createQueue<T>(queueName: string, options: BullConfigOptions = {
           delay: 2000,
         },
         removeOnComplete: {
-          age: 3600,
+          age: 3600, // keep completed jobs for 1 hour
         },
         removeOnFail: false,
       },
@@ -49,11 +52,13 @@ export function createQueue<T>(queueName: string, options: BullConfigOptions = {
     logger.log(`Queue ${queueName} created successfully`);
     return queue;
   } catch (error) {
-    logger.error(`Failed to create queue ${queueName}: ${error.message}`, error.stack);
+    logger.error(
+      `Failed to create queue ${queueName}: ${error.message}`,
+      error.stack,
+    );
     throw error;
   }
 }
-
 /**
  * Get queue stats with error handling
  */
@@ -114,7 +119,7 @@ export function createWorker<T>(
 /**
  * Utility: Add job to queue with retry logic
  */
-export async function addJobToQueue<T>(
+export async function addJobToQueue(
   queue: Queue,
   jobName: string,
   data: any,

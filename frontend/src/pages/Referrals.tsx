@@ -751,7 +751,9 @@ const Referrals: FC = () => {
           <ExportButton
             exportType="REFERRALS"
             pageTitle="Referrals"
-            filters={{ status: filterStatus !== 'ALL' ? filterStatus : undefined }}
+            filters={{
+              status: filterStatus !== 'ALL' ? filterStatus : undefined,
+            }}
             isCompact
           />
 

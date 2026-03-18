@@ -89,7 +89,9 @@ const ExportButton: FC<ExportButtonProps> = ({
       // Poll for status
       await pollExportStatus(jobId);
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to start export';
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || 'Failed to start export';
       showNotification?.(message, 'error');
       setExporting(false);
     }
@@ -130,6 +132,7 @@ const ExportButton: FC<ExportButtonProps> = ({
         setTimeout(() => pollExportStatus(jobId, attempts + 1), 1000);
       }
     } catch (_error) {
+      console.error('Failed to check export status:', _error);
       showNotification?.('Failed to check export status', 'error');
       setExporting(false);
     }
@@ -138,7 +141,7 @@ const ExportButton: FC<ExportButtonProps> = ({
   const handleDownload = async (jobId: string) => {
     try {
       const response = await apiService.export.download(jobId);
-      
+
       // Create blob from response
       const blob = new Blob([response.data], {
         type: response.headers['content-type'] || 'application/octet-stream',
@@ -153,19 +156,21 @@ const ExportButton: FC<ExportButtonProps> = ({
       }
 
       // Create download link and trigger click
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
 
       showNotification?.('Export downloaded successfully!', 'success');
       handleCloseDialog();
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to download export';
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || 'Failed to download export';
       showNotification?.(message, 'error');
     }
   };
@@ -185,6 +190,43 @@ const ExportButton: FC<ExportButtonProps> = ({
       JSON: 'json',
     };
     return extensionMap[format] || format.toLowerCase();
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'COMPLETED') return 'success';
+    if (status === 'FAILED') return 'error';
+    return 'info';
+  };
+
+  const renderActionButton = () => {
+    if (exportJob?.status === 'COMPLETED') {
+      return (
+        <Button
+          variant="contained"
+          onClick={() => handleDownload(exportJob.jobId)}
+          startIcon={<GetAppIcon />}
+        >
+          Download Now
+        </Button>
+      );
+    }
+    if (exportJob?.status === 'FAILED') {
+      return (
+        <Button variant="contained" onClick={handleExport}>
+          Retry Export
+        </Button>
+      );
+    }
+    return (
+      <Button
+        variant="contained"
+        onClick={handleExport}
+        disabled={exporting}
+        startIcon={exporting && <CircularProgress size={20} />}
+      >
+        {exporting ? 'Exporting...' : 'Start Export'}
+      </Button>
+    );
   };
 
   return (
@@ -213,9 +255,7 @@ const ExportButton: FC<ExportButtonProps> = ({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          Export {pageTitle || exportType}
-        </DialogTitle>
+        <DialogTitle>Export {pageTitle || exportType}</DialogTitle>
 
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
@@ -223,16 +263,11 @@ const ExportButton: FC<ExportButtonProps> = ({
             {exportJob && (
               <Box>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Status: <Chip
+                  Status:{' '}
+                  <Chip
                     label={exportJob.status}
                     size="small"
-                    color={
-                      exportJob.status === 'COMPLETED'
-                        ? 'success'
-                        : exportJob.status === 'FAILED'
-                          ? 'error'
-                          : 'info'
-                    }
+                    color={getStatusColor(exportJob.status)}
                     variant="outlined"
                   />
                 </Typography>
@@ -253,7 +288,8 @@ const ExportButton: FC<ExportButtonProps> = ({
 
                 {exportJob.status === 'COMPLETED' && (
                   <Alert severity="success" sx={{ mt: 1 }}>
-                    Export completed! File size: {formatFileSize(exportJob.fileSize)}
+                    Export completed! File size:{' '}
+                    {formatFileSize(exportJob.fileSize)}
                   </Alert>
                 )}
 
@@ -287,14 +323,10 @@ const ExportButton: FC<ExportButtonProps> = ({
             <Box sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 <strong>Format Details:</strong>
-                <br />
-                • <strong>CSV</strong>: Universal spreadsheet format
-                <br />
-                • <strong>Excel</strong>: Formatted with multiple sheets
-                <br />
-                • <strong>PDF</strong>: Professional report
-                <br />
-                • <strong>JSON</strong>: Structured data format
+                <br />• <strong>CSV</strong>: Universal spreadsheet format
+                <br />• <strong>Excel</strong>: Formatted with multiple sheets
+                <br />• <strong>PDF</strong>: Professional report
+                <br />• <strong>JSON</strong>: Structured data format
               </Typography>
             </Box>
           </Stack>
@@ -305,31 +337,7 @@ const ExportButton: FC<ExportButtonProps> = ({
             Cancel
           </Button>
 
-          {exportJob?.status === 'COMPLETED' ? (
-            <Button
-              variant="contained"
-              onClick={() => handleDownload(exportJob.jobId)}
-              startIcon={<GetAppIcon />}
-            >
-              Download Now
-            </Button>
-          ) : exportJob?.status === 'FAILED' ? (
-            <Button
-              variant="contained"
-              onClick={handleExport}
-            >
-              Retry Export
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              onClick={handleExport}
-              disabled={exporting}
-              startIcon={exporting && <CircularProgress size={20} />}
-            >
-              {exporting ? 'Exporting...' : 'Start Export'}
-            </Button>
-          )}
+          {renderActionButton()}
         </DialogActions>
       </Dialog>
     </>

@@ -11,8 +11,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly logger: WinstonLoggerService) {}
 
   async onModuleInit() {
+    const disableRedis = process.env.DISABLE_REDIS === 'true';
     const redisUrl = process.env.REDIS_URL;
-    const isRedisRequired = !!redisUrl; // Only required if explicitly configured
+    const isRedisRequired = !!redisUrl && !disableRedis; // Only required if configured AND not explicitly disabled
+    
+    if (disableRedis) {
+      this.logger.warn('Redis disabled via DISABLE_REDIS environment variable', 'RedisService');
+      // Create mock clients
+      this.client = this.createMockRedisClient();
+      this.subscriber = this.createMockRedisClient();
+      this.publisher = this.createMockRedisClient();
+      return;
+    }
+
     let client, subscriber, publisher;
     if (redisUrl && redisUrl.trim() !== '') {
       const isTls = redisUrl.startsWith('rediss://');

@@ -7,8 +7,8 @@ import { CsvGenerator } from '../../export/generators/csv.generator';
 import { JsonGenerator } from '../../export/generators/json.generator';
 import { ExcelGenerator } from '../../export/generators/excel.generator';
 import { PdfGenerator } from '../../export/generators/pdf.generator';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 interface ExportJobData {
   jobId: string;
@@ -561,7 +561,7 @@ export class ExportProcessor extends WorkerHost {
           }
           return this.jsonGenerator.generate(data, jobData.filename, jobData.userId);
 
-        case 'excel':
+        case 'excel': {
           let excelBuffer: Buffer;
           if (exportType.toUpperCase() === 'ANALYTICS') {
             excelBuffer = await this.excelGenerator.generateAnalyticsExcel(data);
@@ -575,10 +575,11 @@ export class ExportProcessor extends WorkerHost {
             excelBuffer = await this.excelGenerator.generate(data, jobData.filename);
           }
           return Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
+        }
 
-        case 'pdf':
+        case 'pdf': {
           // Flatten data before PDF generation for proper table rendering
-          const flattenedData = this.prepareDataForPdf(data, exportType);
+          const flattenedData = this.prepareDataForPdf(data, jobData.exportType);
           this.logger.log(`📊 PDF Export - Raw data: ${data.length} items, Flattened: ${flattenedData.length} rows with columns: ${flattenedData.length > 0 ? Object.keys(flattenedData[0]).join(', ') : 'N/A'}`);
           
           const pdfBuffer = await this.pdfGenerator.generate(
@@ -591,6 +592,7 @@ export class ExportProcessor extends WorkerHost {
             ],
           );
           return Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
+        }
 
         default:
           throw new Error(`Unsupported export format: ${format}`);
@@ -604,7 +606,7 @@ export class ExportProcessor extends WorkerHost {
   /**
    * Flatten nested data for PDF table rendering
    */
-  private prepareDataForPdf(data: any[], exportType: string): any[] {
+  private prepareDataForPdf(data: any[], _exportType: string): any[] {
     return data.map((item) => {
       const flattened: any = {};
       const processed = new Set<string>();
@@ -632,12 +634,12 @@ export class ExportProcessor extends WorkerHost {
                 flattened[newKey] = objValue.id;
               } else {
                 const stringProp = Object.entries(objValue).find(
-                  ([_k, v]) => typeof v === 'string'
+                  ([_, v]) => typeof v === 'string'
                 );
                 flattened[newKey] = stringProp ? stringProp[1] : '';
               }
             } else {
-              flattened[newKey] = String(value);
+              flattened[newKey] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
             }
           });
         } else {
@@ -653,7 +655,7 @@ export class ExportProcessor extends WorkerHost {
         } else if (typeof value === 'object') {
           flattenValue(value, key);
         } else {
-          flattened[key] = String(value);
+          flattened[key] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
         }
       });
 

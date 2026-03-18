@@ -21,16 +21,26 @@ export interface ReportJobOptions {
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
+  private redisDisabled = process.env.DISABLE_REDIS === 'true';
 
   constructor(
-    @InjectQueue(EXPORT_QUEUE_NAME) private readonly exportQueue: Queue,
-    @InjectQueue(REPORTS_QUEUE_NAME) private readonly reportsQueue: Queue,
-  ) {}
+    @InjectQueue(EXPORT_QUEUE_NAME) private readonly exportQueue?: Queue,
+    @InjectQueue(REPORTS_QUEUE_NAME) private readonly reportsQueue?: Queue,
+  ) {
+    if (this.redisDisabled) {
+      this.logger.warn('⚠️  Redis disabled - job queuing disabled (DISABLE_REDIS=true)');
+    }
+  }
 
   /**
    * Add an export job to the queue
    */
-  async addExportJob(jobId: string, options: ExportJobOptions): Promise<Job> {
+  async addExportJob(jobId: string, options: ExportJobOptions): Promise<Job | null> {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Export job queuing disabled (Redis disabled)');
+      return null;
+    }
+    
     try {
       const job = await this.exportQueue.add(
         'export',
@@ -63,7 +73,12 @@ export class QueueService {
   /**
    * Add a scheduled report job to the queue
    */
-  async addReportJob(reportId: string, options: ReportJobOptions): Promise<Job> {
+  async addReportJob(reportId: string, options: ReportJobOptions): Promise<Job | null> {
+    if (this.redisDisabled || !this.reportsQueue) {
+      this.logger.debug('Report job queuing disabled (Redis disabled)');
+      return null;
+    }
+    
     try {
       const job = await this.reportsQueue.add(
         'report',

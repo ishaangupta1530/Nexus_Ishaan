@@ -3,8 +3,8 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { REPORTS_QUEUE_NAME } from '../queue.constants';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 interface ReportJobData {
   reportId: string;
@@ -124,7 +124,7 @@ export class ReportsProcessor extends WorkerHost {
   /**
    * Calculate next run time based on cron schedule
    */
-  private calculateNextRun(jobData: ReportJobData): Date {
+  private calculateNextRun(_jobData: ReportJobData): Date {
     // This should integrate with cron calculation
     // For now, return same time next day
     const nextRun = new Date();

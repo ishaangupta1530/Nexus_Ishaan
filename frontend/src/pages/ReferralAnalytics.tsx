@@ -116,7 +116,15 @@ const ReferralAnalytics: FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 2,
+            mb: 2,
+          }}
+        >
           <Typography variant="h4" fontWeight="bold">
             <Assessment sx={{ mr: 1, verticalAlign: 'bottom' }} />
             Referral Analytics Dashboard
