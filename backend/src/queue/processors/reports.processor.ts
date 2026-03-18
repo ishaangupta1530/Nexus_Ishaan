@@ -124,7 +124,7 @@ export class ReportsProcessor extends WorkerHost {
   /**
    * Calculate next run time based on cron schedule
    */
-  private calculateNextRun(_jobData: ReportJobData): Date {
+  private calculateNextRun(): Date {
     // This should integrate with cron calculation
     // For now, return same time next day
     const nextRun = new Date();

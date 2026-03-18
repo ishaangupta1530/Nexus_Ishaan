@@ -606,7 +606,7 @@ export class ExportProcessor extends WorkerHost {
   /**
    * Flatten nested data for PDF table rendering
    */
-  private prepareDataForPdf(data: any[], _exportType: string): any[] {
+  private prepareDataForPdf(data: any[]): any[] {
     return data.map((item) => {
       const flattened: any = {};
       const processed = new Set<string>();
@@ -634,7 +634,7 @@ export class ExportProcessor extends WorkerHost {
                 flattened[newKey] = objValue.id;
               } else {
                 const stringProp = Object.entries(objValue).find(
-                  ([_, v]) => typeof v === 'string'
+                  ([, v]) => typeof v === 'string'
                 );
                 flattened[newKey] = stringProp ? stringProp[1] : '';
               }
