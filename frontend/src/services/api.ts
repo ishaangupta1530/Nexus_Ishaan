@@ -1,9 +1,11 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 type RefreshAuthResponse = {
   accessToken?: string;
 };
+
+type RetryableRequest = AxiosRequestConfig & { _retry?: boolean };
 
 let apiAccessToken: string | null = null;
 
@@ -113,7 +115,7 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      const retryableRequest = originalRequest as any;
+      const retryableRequest = originalRequest as RetryableRequest;
       if (originalRequest && !retryableRequest._retry) {
         retryableRequest._retry = true;
         try {

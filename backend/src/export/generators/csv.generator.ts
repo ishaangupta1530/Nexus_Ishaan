@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 export class CsvGenerator {
   private readonly logger = new Logger(CsvGenerator.name);
 
-  generate(data: any[], filename: string): Buffer {
+  generate(data: any[]): Buffer {
     try {
       if (!data || data.length === 0) {
         return Buffer.from('');

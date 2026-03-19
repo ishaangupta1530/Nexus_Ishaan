@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { EXPORT_QUEUE_NAME, REPORTS_QUEUE_NAME } from '../queue.constants';
@@ -24,8 +24,8 @@ export class QueueService {
   private redisDisabled = process.env.DISABLE_REDIS === 'true';
 
   constructor(
-    @InjectQueue(EXPORT_QUEUE_NAME) private readonly exportQueue?: Queue,
-    @InjectQueue(REPORTS_QUEUE_NAME) private readonly reportsQueue?: Queue,
+    @Optional() @InjectQueue(EXPORT_QUEUE_NAME) private readonly exportQueue?: Queue,
+    @Optional() @InjectQueue(REPORTS_QUEUE_NAME) private readonly reportsQueue?: Queue,
   ) {
     if (this.redisDisabled) {
       this.logger.warn('⚠️  Redis disabled - job queuing disabled (DISABLE_REDIS=true)');

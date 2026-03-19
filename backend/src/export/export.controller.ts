@@ -10,8 +10,9 @@ import {
   Param,
   BadRequestException,
 } from '@nestjs/common';
-import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
+import { IsEnum, IsOptional, IsObject } from 'class-validator';
 import { Response } from 'express';
+import { Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
 import { CsvGenerator } from './generators/csv.generator';
@@ -45,6 +46,7 @@ interface ExportJob {
 @Controller('export')
 @UseGuards(JwtAuthGuard)
 export class ExportController {
+  private readonly logger = new Logger(ExportController.name);
   private jobs = new Map<string, ExportJob>();
 
   constructor(
@@ -94,7 +96,7 @@ export class ExportController {
 
           switch (formatLower) {
             case 'csv':
-              buffer = this.csvGenerator.generate(mockData, job.filename);
+              buffer = this.csvGenerator.generate(mockData);
               break;
 
             case 'json':
@@ -102,7 +104,7 @@ export class ExportController {
               break;
 
             case 'excel':
-              buffer = this.excelGenerator.generate(mockData, job.filename);
+              buffer = this.excelGenerator.generate(mockData);
               break;
 
             case 'pdf':
@@ -209,12 +211,16 @@ export class ExportController {
 
       return res.send(job.data);
     } catch (error) {
-      console.error('Download error:', error);
+      this.logError('Download error:', error);
       return res.status(500).json({
         error: 'Download failed',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
+  }
+
+  private logError(message: string, error: unknown): void {
+    this.logger.error(`${message} ${error instanceof Error ? error.message : String(error)}`);
   }
 
   private _getFileExtension(format: string): string {

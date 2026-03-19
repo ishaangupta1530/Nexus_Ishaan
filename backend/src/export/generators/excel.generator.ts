@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 export class ExcelGenerator {
   private readonly logger = new Logger(ExcelGenerator.name);
 
-  generate(data: any[], filename: string): Buffer {
+  generate(data: any[]): Buffer {
     try {
       if (!data || data.length === 0) {
         return Buffer.from('');
