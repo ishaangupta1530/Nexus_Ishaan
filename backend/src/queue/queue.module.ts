@@ -5,10 +5,7 @@ import { ExportProcessor } from './processors/export.processor';
 import { ReportsProcessor } from './processors/reports.processor';
 import { QueueService } from './services/queue.service';
 import { PrismaModule } from '../prisma/prisma.module';
-import { CsvGenerator } from '../export/generators/csv.generator';
-import { JsonGenerator } from '../export/generators/json.generator';
-import { ExcelGenerator } from '../export/generators/excel.generator';
-import { PdfGenerator } from '../export/generators/pdf.generator';
+import { ExportModule } from '../export/export.module';
 
 const disableRedis = process.env.DISABLE_REDIS === 'true';
 
@@ -55,15 +52,11 @@ const bullModuleImports = disableRedis
     ];
 
 @Module({
-  imports: [PrismaModule, ...bullModuleImports],
+  imports: [PrismaModule, ExportModule, ...bullModuleImports],
   providers: [
     ExportProcessor,
     ReportsProcessor,
     QueueService,
-    CsvGenerator,
-    JsonGenerator,
-    ExcelGenerator,
-    PdfGenerator,
   ],
   exports: [QueueService],
 })
