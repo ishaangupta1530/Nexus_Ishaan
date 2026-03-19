@@ -113,8 +113,9 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      if (originalRequest && !originalRequest._retry) {
-        originalRequest._retry = true;
+      const retryableRequest = originalRequest as any;
+      if (originalRequest && !retryableRequest._retry) {
+        retryableRequest._retry = true;
         try {
           const refreshResponse = await axios.post<RefreshAuthResponse>(
             '/auth/refresh',

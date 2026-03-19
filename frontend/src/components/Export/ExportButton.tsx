@@ -307,7 +307,7 @@ const ExportButton: FC<ExportButtonProps> = ({
                 <InputLabel>Export Format</InputLabel>
                 <Select
                   value={format}
-                  onChange={(e) => setFormat(e.target.value)}
+                  onChange={(e) => setFormat(e.target.value as 'CSV' | 'PDF' | 'JSON' | 'XLSX')}
                   label="Export Format"
                 >
                   {formatOptions.map((option) => (
