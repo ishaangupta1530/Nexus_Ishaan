@@ -572,7 +572,7 @@ export class ExportProcessor extends WorkerHost {
           } else if (exportType.toUpperCase() === 'POSTS') {
             excelBuffer = await this.excelGenerator.generatePostsExcel(data);
           } else {
-            excelBuffer = await this.excelGenerator.generate(data, jobData.filename);
+            excelBuffer = this.excelGenerator.generate(data, jobData.filename);
           }
           return Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
         }
