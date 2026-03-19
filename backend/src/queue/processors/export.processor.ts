@@ -579,7 +579,7 @@ export class ExportProcessor extends WorkerHost {
 
         case 'pdf': {
           // Flatten data before PDF generation for proper table rendering
-          const flattenedData = this.prepareDataForPdf(data, jobData.exportType);
+          const flattenedData = this.prepareDataForPdf(data);
           this.logger.log(`📊 PDF Export - Raw data: ${data.length} items, Flattened: ${flattenedData.length} rows with columns: ${flattenedData.length > 0 ? Object.keys(flattenedData[0]).join(', ') : 'N/A'}`);
           
           const pdfBuffer = await this.pdfGenerator.generate(

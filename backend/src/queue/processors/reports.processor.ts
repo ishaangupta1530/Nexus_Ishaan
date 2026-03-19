@@ -49,7 +49,7 @@ export class ReportsProcessor extends WorkerHost {
       // Update report status in database
       await this.updateScheduledReport(job.data.reportId, {
         lastRunAt: new Date(),
-        nextRunAt: this.calculateNextRun(job.data), // Will be updated by cron scheduler
+        nextRunAt: this.calculateNextRun(), // Will be updated by cron scheduler
         status: 'COMPLETED',
       });
 
