@@ -608,7 +608,7 @@ export class ExportProcessor extends WorkerHost {
               heading: jobData.exportType,
               content: flattenedData,
             },
-          ],q
+          ]
         );
 
         return Buffer.isBuffer(pdfBuffer)
