@@ -541,68 +541,89 @@ export class ExportProcessor extends WorkerHost {
   /**
    * Generate export file based on format
    */
-  private async generateExportFile(jobData: ExportJobData, data: any[]): Promise<Buffer> {
-    try {
-      const { format, exportType } = jobData;
+ private async generateExportFile(jobData: ExportJobData, data: any[]): Promise<Buffer> {
+  try {
+    const { format, exportType } = jobData;
 
-      switch (format.toLowerCase()) {
-        case 'csv':
-          return this.csvGenerator.generate(data, jobData.filename);
+    switch (format.toLowerCase()) {
+      case 'csv':
+        // ✅ FIX: removed filename
+        return this.csvGenerator.generate(data);
 
-        case 'json':
-          if (exportType.toUpperCase() === 'ANALYTICS') {
-            return this.jsonGenerator.generateAnalyticsJson(data, jobData.userId);
-          } else if (exportType.toUpperCase() === 'REFERRALS') {
-            return this.jsonGenerator.generateReferralsJson(data, jobData.userId);
-          } else if (exportType.toUpperCase() === 'CONNECTIONS') {
-            return this.jsonGenerator.generateConnectionsJson(data, jobData.userId);
-          } else if (exportType.toUpperCase() === 'POSTS') {
-            return this.jsonGenerator.generatePostsJson(data, jobData.userId);
-          }
-          return this.jsonGenerator.generate(data, jobData.filename, jobData.userId);
-
-        case 'excel': {
-          let excelBuffer: Buffer;
-          if (exportType.toUpperCase() === 'ANALYTICS') {
-            excelBuffer = await this.excelGenerator.generateAnalyticsExcel(data);
-          } else if (exportType.toUpperCase() === 'REFERRALS') {
-            excelBuffer = await this.excelGenerator.generateReferralsExcel(data);
-          } else if (exportType.toUpperCase() === 'CONNECTIONS') {
-            excelBuffer = await this.excelGenerator.generateConnectionsExcel(data);
-          } else if (exportType.toUpperCase() === 'POSTS') {
-            excelBuffer = await this.excelGenerator.generatePostsExcel(data);
-          } else {
-            excelBuffer = this.excelGenerator.generate(data, jobData.filename);
-          }
-          return Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
-        }
-
-        case 'pdf': {
-          // Flatten data before PDF generation for proper table rendering
-          const flattenedData = this.prepareDataForPdf(data);
-          this.logger.log(`📊 PDF Export - Raw data: ${data.length} items, Flattened: ${flattenedData.length} rows with columns: ${flattenedData.length > 0 ? Object.keys(flattenedData[0]).join(', ') : 'N/A'}`);
-          
-          const pdfBuffer = await this.pdfGenerator.generate(
-            jobData.exportType,
-            [
-              {
-                heading: jobData.exportType,
-                content: flattenedData  // FLATTENED DATA for table rendering
-              }
-            ],
-          );
-          return Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
-        }
-
-        default:
-          throw new Error(`Unsupported export format: ${format}`);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to generate export file: ${error.message}`);
-      throw error;
-    }
+      case 'json':
+  if (exportType.toUpperCase() === 'ANALYTICS') {
+    return this.jsonGenerator.generateAnalyticsJson(data, jobData.userId);
+  } else if (exportType.toUpperCase() === 'REFERRALS') {
+    return this.jsonGenerator.generateReferralsJson(data, jobData.userId);
+  } else if (exportType.toUpperCase() === 'CONNECTIONS') {
+    return this.jsonGenerator.generateConnectionsJson(data, jobData.userId);
+  } else if (exportType.toUpperCase() === 'POSTS') {
+    return this.jsonGenerator.generatePostsJson(data, jobData.userId);
   }
 
+  // ❌ WRONG
+  // return this.jsonGenerator.generate(data);
+
+  // ✅ FIXED
+  return this.jsonGenerator.generate(
+    data,
+    jobData.filename,
+    jobData.userId
+  );
+
+      case 'excel': {
+        let excelBuffer: Buffer;
+
+        if (exportType.toUpperCase() === 'ANALYTICS') {
+          excelBuffer = await this.excelGenerator.generateAnalyticsExcel(data);
+        } else if (exportType.toUpperCase() === 'REFERRALS') {
+          excelBuffer = await this.excelGenerator.generateReferralsExcel(data);
+        } else if (exportType.toUpperCase() === 'CONNECTIONS') {
+          excelBuffer = await this.excelGenerator.generateConnectionsExcel(data);
+        } else if (exportType.toUpperCase() === 'POSTS') {
+          excelBuffer = await this.excelGenerator.generatePostsExcel(data);
+        } else {
+          // ✅ FIX: removed filename
+          excelBuffer = this.excelGenerator.generate(data);
+        }
+
+        return Buffer.isBuffer(excelBuffer)
+          ? excelBuffer
+          : Buffer.from(excelBuffer);
+      }
+
+      case 'pdf': {
+        const flattenedData = this.prepareDataForPdf(data);
+
+        this.logger.log(
+          `📊 PDF Export - Raw data: ${data.length} items, Flattened: ${
+            flattenedData.length
+          } rows`
+        );
+
+        const pdfBuffer = await this.pdfGenerator.generate(
+          jobData.exportType,
+          [
+            {
+              heading: jobData.exportType,
+              content: flattenedData,
+            },
+          ],q
+        );
+
+        return Buffer.isBuffer(pdfBuffer)
+          ? pdfBuffer
+          : Buffer.from(pdfBuffer);
+      }
+
+      default:
+        throw new Error(`Unsupported export format: ${format}`);
+    }
+  } catch (error) {
+    this.logger.error(`Failed to generate export file: ${error.message}`);
+    throw error;
+  }
+}
   /**
    * Flatten nested data for PDF table rendering
    */
