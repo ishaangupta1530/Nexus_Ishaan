@@ -30,6 +30,7 @@ import { ReferralAnalyticsModule } from './referral-analytics/referral-analytics
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ExportModule } from './export/export.module';
+import { QueueModule } from './queue/queue.module';
 import { securityConfig } from './common/config/security.config';
 import { envValidationSchema } from './common/config/env.validation';
 import { WinstonLoggerService } from './common/logger/winston-logger.service';
@@ -88,6 +89,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
     HealthModule,
     MetricsModule,
     ExportModule,
+    QueueModule,
   ],
   controllers: [AppController, FrontendErrorController],
   providers: [
