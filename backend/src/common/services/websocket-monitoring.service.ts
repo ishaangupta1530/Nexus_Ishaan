@@ -63,7 +63,7 @@ export interface RealtimeEvent {
 @Injectable()
 export class WebSocketMonitoringService {
   private readonly logger = new Logger(WebSocketMonitoringService.name);
-  private redis: Redis;
+  private redis: any; // Allowing reassignment for mock client fallback
 
   // Metrics tracking
   private currentMetrics: WebSocketMetrics = this.initializeMetrics();
@@ -86,23 +86,67 @@ export class WebSocketMonitoringService {
    * Initialize Redis connection
    */
   private initializeRedis(): void {
+    const disableRedis = this.configService.get('DISABLE_REDIS', 'false');
     const redisUrl = this.configService.get('REDIS_URL');
     
-    // Skip Redis initialization if not configured
-    if (!redisUrl || redisUrl.trim() === '') {
-      this.logger.warn('⚠️ WebSocket Monitoring: Redis not configured - single-server mode');
+    // Skip Redis initialization if explicitly disabled
+    if (disableRedis === 'true') {
+      this.logger.warn('⚠️ WebSocket Monitoring: Redis disabled - using mock client');
+      this.redis = this.createMockRedisClient();
       return;
     }
     
-    this.redis = new Redis(redisUrl);
+    // Skip Redis initialization if not configured
+    if (!redisUrl || redisUrl.trim() === '') {
+      this.logger.warn('⚠️ WebSocket Monitoring: Redis not configured - using mock client');
+      this.redis = this.createMockRedisClient();
+      return;
+    }
+    
+    try {
+      this.redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+        enableOfflineQueue: false,
+        lazyConnect: true, // Never auto-connect
+        retryStrategy: () => false, // Disable retries
+      } as any);
 
-    this.redis.on('connect', () => {
-      this.logger.log('🔗 WebSocket Monitoring: Redis connected');
-    });
+      // Setup error handling
+      this.redis.on('error', (err: any) => {
+        this.logger.warn('🔇 WebSocket Monitoring: Redis unavailable, using mock client:', err.message);
+        this.redis = this.createMockRedisClient();
+      });
 
-    this.redis.on('error', (err) => {
-      this.logger.error('❌ WebSocket Monitoring: Redis error:', err);
-    });
+      this.redis.on('connect', () => {
+        this.logger.log('🔗 WebSocket Monitoring: Redis connected');
+      });
+    } catch (error) {
+      this.logger.error('Failed to initialize WebSocket Monitoring Redis:', error);
+      this.redis = this.createMockRedisClient();
+    }
+  }
+
+  /**
+   * Create a mock Redis client for development
+   */
+  private createMockRedisClient(): any {
+    return {
+      on: () => {},
+      get: () => Promise.resolve(null),
+      set: () => Promise.resolve('OK'),
+      del: () => Promise.resolve(1),
+      exists: () => Promise.resolve(0),
+      incr: () => Promise.resolve(1),
+      decr: () => Promise.resolve(0),
+      lpush: () => Promise.resolve(1),
+      rpush: () => Promise.resolve(1),
+      llen: () => Promise.resolve(0),
+      lrange: () => Promise.resolve([]),
+      expire: () => Promise.resolve(1),
+      ttl: () => Promise.resolve(-1),
+      keys: () => Promise.resolve([]),
+    };
   }
 
   /**
@@ -358,12 +402,12 @@ export class WebSocketMonitoringService {
 
       return {
         namespace,
-        connections: parseInt(connections || '0'),
+        connections: Number.parseInt(connections || '0'),
         messages: {
-          sent: parseInt(messagesSent || '0'),
-          received: parseInt(messagesReceived || '0'),
-          queued: parseInt(messagesQueued || '0'),
-          failed: parseInt(messagesFailed || '0'),
+          sent: Number.parseInt(messagesSent || '0'),
+          received: Number.parseInt(messagesReceived || '0'),
+          queued: Number.parseInt(messagesQueued || '0'),
+          failed: Number.parseInt(messagesFailed || '0'),
         },
       };
     } catch (error) {
@@ -387,13 +431,13 @@ export class WebSocketMonitoringService {
       ]);
 
       return {
-        connectionErrors: parseInt(connectionErrors || '0'),
-        authErrors: parseInt(authErrors || '0'),
-        messageErrors: parseInt(messageErrors || '0'),
+        connectionErrors: Number.parseInt(connectionErrors || '0'),
+        authErrors: Number.parseInt(authErrors || '0'),
+        messageErrors: Number.parseInt(messageErrors || '0'),
         total:
-          parseInt(connectionErrors || '0') +
-          parseInt(authErrors || '0') +
-          parseInt(messageErrors || '0'),
+          Number.parseInt(connectionErrors || '0') +
+          Number.parseInt(authErrors || '0') +
+          Number.parseInt(messageErrors || '0'),
       };
     } catch (error) {
       this.logger.error('❌ Error getting error stats:', error);

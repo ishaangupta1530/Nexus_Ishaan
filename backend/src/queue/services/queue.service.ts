@@ -21,7 +21,7 @@ export interface ReportJobOptions {
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
-  private redisDisabled = process.env.DISABLE_REDIS === 'true';
+  private readonly redisDisabled = process.env.DISABLE_REDIS === 'true';
 
   constructor(
     @Optional() @InjectQueue(EXPORT_QUEUE_NAME) private readonly exportQueue?: Queue,
@@ -108,6 +108,11 @@ export class QueueService {
    * Get job status from export queue
    */
   async getExportJobStatus(jobId: string) {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Job status lookup disabled (Redis disabled)');
+      return null;
+    }
+
     try {
       const job = await this.exportQueue.getJob(jobId);
 
@@ -140,6 +145,19 @@ export class QueueService {
    * Get job stats from export queue
    */
   async getExportQueueStats() {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Export queue stats lookup disabled (Redis disabled)');
+      return {
+        queue: EXPORT_QUEUE_NAME,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        total: 0,
+      };
+    }
+
     try {
       const counts = await this.exportQueue.getJobCounts(
         'wait',
@@ -173,6 +191,19 @@ export class QueueService {
    * Get job stats from reports queue
    */
   async getReportsQueueStats() {
+    if (this.redisDisabled || !this.reportsQueue) {
+      this.logger.debug('Reports queue stats lookup disabled (Redis disabled)');
+      return {
+        queue: REPORTS_QUEUE_NAME,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        total: 0,
+      };
+    }
+
     try {
       const counts = await this.reportsQueue.getJobCounts(
         'wait',
@@ -206,6 +237,11 @@ export class QueueService {
    * Cancel an export job
    */
   async cancelExportJob(jobId: string): Promise<boolean> {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Job cancellation disabled (Redis disabled)');
+      return false;
+    }
+
     try {
       const job = await this.exportQueue.getJob(jobId);
 
@@ -226,7 +262,12 @@ export class QueueService {
   /**
    * Retry a failed job
    */
-  async retryExportJob(jobId: string): Promise<Job> {
+  async retryExportJob(jobId: string): Promise<Job | null> {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Job retry disabled (Redis disabled)');
+      return null;
+    }
+
     try {
       const job = await this.exportQueue.getJob(jobId);
 
@@ -253,6 +294,11 @@ export class QueueService {
    * Clean up old completed/failed jobs
    */
   async cleanupOldJobs(olderThanDays: number = 7): Promise<{ cleaned: number }> {
+    if (this.redisDisabled || !this.exportQueue || !this.reportsQueue) {
+      this.logger.debug('Job cleanup disabled (Redis disabled)');
+      return { cleaned: 0 };
+    }
+
     try {
       const olderThanMs = olderThanDays * 24 * 60 * 60 * 1000;
 
@@ -278,13 +324,22 @@ export class QueueService {
     start: number = 0,
     end: number = 10,
   ) {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Queue jobs lookup disabled (Redis disabled)');
+      return {
+        jobs: [],
+        count: 0,
+      };
+    }
+
     try {
       const jobs = await this.exportQueue.getJobs([status], start, end);
 
-      return {
-        jobs: jobs.map((job) => ({
+      // Fetch states for all jobs
+      const jobsWithState = await Promise.all(
+        jobs.map(async (job) => ({
           id: job.id,
-          state: job.getState ? job.getState.toString() : 'unknown',
+          state: await job.getState(),
           data: job.data,
           result: job.returnvalue,
           progress: (job.progress as number) || 0,
@@ -293,7 +348,11 @@ export class QueueService {
             completed: job.finishedOn,
           },
         })),
-        count: jobs.length,
+      );
+
+      return {
+        jobs: jobsWithState,
+        count: jobsWithState.length,
       };
     } catch (error) {
       this.logger.error(`Failed to get export queue jobs: ${error.message}`);
@@ -305,6 +364,11 @@ export class QueueService {
    * Pause/Resume export queue
    */
   async toggleExportQueuePause(pause: boolean): Promise<void> {
+    if (this.redisDisabled || !this.exportQueue) {
+      this.logger.debug('Queue pause/resume disabled (Redis disabled)');
+      return;
+    }
+
     try {
       if (pause) {
         await this.exportQueue.pause();

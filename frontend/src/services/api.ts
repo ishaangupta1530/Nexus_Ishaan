@@ -422,10 +422,10 @@ export const apiService = {
         responseType: 'arraybuffer',
       }),
 
-    getHistory: (params?: { skip?: number; take?: number }) =>
-      api.get('/export/history', { params }),
-
-    delete: (jobId: string) => api.delete(`/export/${jobId}`),
+    // TODO: Implement backend endpoints for getHistory and delete when persistent export storage is added
+    // getHistory: (params?: { skip?: number; take?: number }) =>
+    //   api.get('/export/history', { params }),
+    // delete: (jobId: string) => api.delete(`/export/${jobId}`),
   },
 };
 

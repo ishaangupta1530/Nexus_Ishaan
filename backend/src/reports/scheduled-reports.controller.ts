@@ -15,7 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
 import { ScheduledReportsService } from './scheduled-reports.service';
-import { CreateScheduledReportDTO, UpdateScheduledReportDTO } from './scheduled-reports.service';
+import { CreateScheduledReportDTO, UpdateScheduledReportDTO } from './dto';
 
 @ApiTags('Scheduled Reports')
 @ApiBearerAuth()
@@ -44,7 +44,7 @@ export class ScheduledReportsController {
     },
   })
   async createScheduledReport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Body() dto: CreateScheduledReportDTO,
   ) {
     return this.scheduledReportsService.createScheduledReport(userId, dto);
@@ -79,7 +79,7 @@ export class ScheduledReportsController {
     },
   })
   async listScheduledReports(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Query('skip') skip: number = 0,
     @Query('take') take: number = 10,
   ) {
@@ -93,7 +93,7 @@ export class ScheduledReportsController {
     description: 'Scheduled report details',
   })
   async getScheduledReport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('id') reportId: string,
   ) {
     return this.scheduledReportsService.getScheduledReport(reportId, userId);
@@ -106,7 +106,7 @@ export class ScheduledReportsController {
     description: 'Report updated successfully',
   })
   async updateScheduledReport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('id') reportId: string,
     @Body() dto: UpdateScheduledReportDTO,
   ) {
@@ -121,7 +121,7 @@ export class ScheduledReportsController {
     description: 'Report deleted successfully',
   })
   async deleteScheduledReport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('id') reportId: string,
   ) {
     return this.scheduledReportsService.deleteScheduledReport(reportId, userId);
@@ -139,7 +139,7 @@ export class ScheduledReportsController {
     },
   })
   async triggerReportNow(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('id') reportId: string,
   ) {
     return this.scheduledReportsService.triggerReportNow(reportId, userId);

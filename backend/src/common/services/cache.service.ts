@@ -9,7 +9,7 @@ import Redis from 'ioredis';
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
-  private readonly redis: Redis;
+  private redis: any; // Non-readonly to allow fallback to mock client
   private readonly defaultTTL = 3600; // 1 hour default
 
   // Cache key prefixes for organization
@@ -23,30 +23,47 @@ export class CacheService {
     SEARCH: 'search:',
   };
 
-  constructor(private configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
+    const disableRedis = this.configService.get<string>('DISABLE_REDIS', 'false');
     const redisUrl = this.configService.get<string>('REDIS_URL');
 
+    // Always use mock client if Redis is explicitly disabled
+    if (disableRedis === 'true') {
+      this.logger.warn('⚠️ Redis disabled - using mock cache client');
+      this.redis = this.createMockRedisClient();
+      return;
+    }
+
     if (redisUrl && redisUrl.trim() !== '') {
-      // Cloud Redis (production)
-      this.redis = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
-        enableReadyCheck: true,
-        enableOfflineQueue: true,
-        lazyConnect: false,
-      });
+      try {
+        // Cloud Redis (production) - never auto-connect
+        this.redis = new Redis(redisUrl, {
+          maxRetriesPerRequest: null,
+          enableReadyCheck: false,
+          enableOfflineQueue: false,
+          lazyConnect: true, // Never auto-connect
+          retryStrategy: () => false, // Disable retries
+        } as any);
+
+        // Don't attempt to connect - just use the client as-is
+        // On error, fallback to mock
+        this.redis.on('error', (err: any) => {
+          this.logger.warn('Redis unavailable, falling back to mock client:', err.message);
+          this.redis = this.createMockRedisClient();
+        });
+
+        this.redis.on('connect', () => {
+          this.logger.log('✅ Cache service connected to Redis');
+        });
+      } catch (error) {
+        this.logger.error('Failed to initialize Redis, using mock cache client:', error);
+        this.redis = this.createMockRedisClient();
+      }
     } else {
       // Local development without Redis - create mock client
       this.logger.warn('⚠️ Redis not configured - using mock cache client');
       this.redis = this.createMockRedisClient();
     }
-
-    this.redis.on('connect', () => {
-      this.logger.log('✅ Cache service connected to Redis');
-    });
 
     this.redis.on('error', (error) => {
       this.logger.error('❌ Redis cache error:', error.message);
@@ -295,7 +312,7 @@ export class CacheService {
       const parsed: any = {};
       for (const [field, val] of Object.entries(value)) {
         try {
-          parsed[field] = JSON.parse(val);
+          parsed[field] = JSON.parse(val as string);
         } catch {
           parsed[field] = val; // Keep as string if not JSON
         }
@@ -499,7 +516,7 @@ export class CacheService {
   private hashString(str: string): string {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+      const char = str.codePointAt(i) ?? 0;
       hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }

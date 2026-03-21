@@ -1,30 +1,13 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/services/queue.service';
+import { CreateScheduledReportDTO, UpdateScheduledReportDTO } from './dto';
 import * as cron from 'cron';
-
-export interface CreateScheduledReportDTO {
-  name: string;
-  reportType: 'REFERRALS' | 'ANALYTICS' | 'CONNECTIONS';
-  format: 'csv' | 'pdf' | 'excel' | 'json';
-  schedule: string; // Cron expression (e.g., '0 0 * * 1' for weekly Monday)
-  recipients: string[];
-  filters?: Record<string, any>;
-  enabled: boolean;
-}
-
-export interface UpdateScheduledReportDTO {
-  name?: string;
-  schedule?: string;
-  recipients?: string[];
-  filters?: Record<string, any>;
-  enabled?: boolean;
-}
 
 @Injectable()
 export class ScheduledReportsService {
   private readonly logger = new Logger(ScheduledReportsService.name);
-  private cronJobs: Map<string, cron.CronJob> = new Map();
+  private readonly cronJobs: Map<string, cron.CronJob> = new Map();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -373,7 +356,7 @@ export class ScheduledReportsService {
       }
 
       // All parts should be numeric or contain valid cron characters
-      const cronCharacters = /^[\d,*/\-]+$/;
+      const cronCharacters = /^[\d,*/-]+$/;
       for (const part of parts) {
         if (!cronCharacters.test(part)) {
           return false;

@@ -9,10 +9,10 @@ import {
   Res,
   Param,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { IsEnum, IsOptional, IsObject } from 'class-validator';
 import { Response } from 'express';
-import { Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
 import { CsvGenerator } from './generators/csv.generator';
@@ -47,7 +47,7 @@ interface ExportJob {
 @UseGuards(JwtAuthGuard)
 export class ExportController {
   private readonly logger = new Logger(ExportController.name);
-  private jobs = new Map<string, ExportJob>();
+  private readonly jobs = new Map<string, ExportJob>();
 
   constructor(
     private readonly csvGenerator: CsvGenerator,
@@ -60,7 +60,7 @@ export class ExportController {
   @HttpCode(HttpStatus.OK)
   async exportData(
     @Body() dto: ExportRequestDto,
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
   ) {
     try {
       if (!dto.type || !dto.format) {
@@ -68,7 +68,7 @@ export class ExportController {
       }
 
       // Generate job ID
-      const jobId = `export-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const jobId = `export-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
       // Create job entry
       const job: ExportJob = {
@@ -107,7 +107,7 @@ export class ExportController {
               buffer = this.excelGenerator.generate(mockData);
               break;
 
-            case 'pdf':
+            case 'pdf': {
               const pdfContent = [
                 {
                   heading: `${dto.type} Export`,
@@ -119,6 +119,7 @@ export class ExportController {
                 pdfContent,
               );
               break;
+            }
 
             default:
               throw new Error(`Invalid format: ${dto.format}`);
@@ -198,7 +199,7 @@ export class ExportController {
       };
 
       const contentType = contentTypeMap[job.format.toLowerCase()] || 'application/octet-stream';
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
       const extension = this._getFileExtension(job.format);
       const finalFilename = `${job.filename}-${timestamp}.${extension}`;
 
@@ -220,7 +221,8 @@ export class ExportController {
   }
 
   private logError(message: string, error: unknown): void {
-    this.logger.error(`${message} ${error instanceof Error ? error.message : String(error)}`);
+    const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+    this.logger.error(`${message} ${errorMessage}`);
   }
 
   private _getFileExtension(format: string): string {

@@ -404,11 +404,44 @@ export class SharedExportService {
     }
   }
 
-  // ==================== PRIVATE HELPERS ====================
-
   /**
-   * Validate password strength
+   * Get public shared export metadata (no authentication required)
    */
+  async getSharedExportMetadata(shareToken: string): Promise<{
+    shareToken: string;
+    isPasswordProtected: boolean;
+    expiresAt?: Date;
+    maxViews?: number;
+    viewsRemaining?: number;
+    createdAt: Date;
+  }> {
+    try {
+      const sharedExport = await this.prisma.sharedExport.findUnique({
+        where: { shareToken },
+      });
+
+      if (!sharedExport) {
+        throw new NotFoundException('Shared export not found');
+      }
+
+      const viewsRemaining = sharedExport.maxViews
+        ? sharedExport.maxViews - sharedExport.viewCount
+        : undefined;
+
+      return {
+        shareToken: sharedExport.shareToken,
+        isPasswordProtected: !!sharedExport.password,
+        expiresAt: sharedExport.expiresAt,
+        maxViews: sharedExport.maxViews,
+        viewsRemaining,
+        createdAt: sharedExport.createdAt,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get shared export metadata: ${error.message}`);
+      throw error;
+    }
+  }
+
   private validatePassword(password: string): void {
     if (!password || password.length < 6) {
       throw new BadRequestException('Password must be at least 6 characters long');

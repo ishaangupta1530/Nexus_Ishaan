@@ -50,7 +50,6 @@ export class ReportsProcessor extends WorkerHost {
       await this.updateScheduledReport(job.data.reportId, {
         lastRunAt: new Date(),
         nextRunAt: this.calculateNextRun(), // Will be updated by cron scheduler
-        status: 'COMPLETED',
       });
 
       await job.updateProgress(100);
@@ -69,10 +68,10 @@ export class ReportsProcessor extends WorkerHost {
         error.stack,
       );
 
-      // Update report status to failed
+      // Note: Update failures are logged but don't cause job to fail again
+      // The cron scheduler will handle next run based on registry state
       await this.updateScheduledReport(job.data.reportId, {
-        status: 'FAILED',
-        lastFailureReason: error.message,
+        lastRunAt: new Date(),
       }).catch((err) => {
         this.logger.error(`Failed to update report status: ${err.message}`);
       });
@@ -96,7 +95,7 @@ export class ReportsProcessor extends WorkerHost {
 
       // Create a placeholder file
       const content = `Report: ${jobData.reportType}\nGenerated: ${new Date().toISOString()}\nFormat: ${jobData.format}\n`;
-      fs.writeFileSync(filepath, content);
+      await fs.promises.writeFile(filepath, content);
 
       this.logger.log(`Report file generated: ${filepath}`);
       return filepath;

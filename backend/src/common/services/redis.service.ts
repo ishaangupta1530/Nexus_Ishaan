@@ -11,77 +11,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly logger: WinstonLoggerService) {}
 
   async onModuleInit() {
-    const disableRedis = process.env.DISABLE_REDIS === 'true';
-    const redisUrl = process.env.REDIS_URL;
-    const isRedisRequired = !!redisUrl && !disableRedis; // Only required if configured AND not explicitly disabled
+    // Always use mock Redis clients - Redis is completely bypassed
+    this.logger.log('🔇 Redis bypassed - using in-memory mock clients', 'RedisService');
     
-    if (disableRedis) {
-      this.logger.warn('Redis disabled via DISABLE_REDIS environment variable', 'RedisService');
-      // Create mock clients
-      this.client = this.createMockRedisClient();
-      this.subscriber = this.createMockRedisClient();
-      this.publisher = this.createMockRedisClient();
-      return;
-    }
-
-    let client, subscriber, publisher;
-    if (redisUrl && redisUrl.trim() !== '') {
-      const isTls = redisUrl.startsWith('rediss://');
-
-      const options = {
-        tls: isTls ? { rejectUnauthorized: false } : undefined,
-        maxRetriesPerRequest: null,
-        retryStrategy: (times: number) => {
-          const delay = Math.min(times * 100, 2000);
-          if (times > 5) return null;
-          return delay;
-        },
-      };
-
-      client = new Redis(redisUrl, options);
-      subscriber = new Redis(redisUrl, options);
-      publisher = new Redis(redisUrl, options);
-    } else {
-      // Create mock Redis clients that don't actually connect
-      // This allows the app to start without Redis for development
-      this.logger.warn('Redis not configured - using mock clients', 'RedisService');
-      client = this.createMockRedisClient();
-      subscriber = this.createMockRedisClient();
-      publisher = this.createMockRedisClient();
-    }
-    this.client = client;
-    this.subscriber = subscriber;
-    this.publisher = publisher;
-
-    this.client.on('connect', () => {
-      this.logger.log('✅ Redis client connected', 'RedisService');
-    });
-
-    // Only log errors if Redis is explicitly required; suppress logs if optional
-    if (isRedisRequired) {
-      this.client.on('error', (error) => {
-        this.logger.error('Redis client error', error.stack, 'RedisService');
-      });
-      this.subscriber.on('error', () => {
-        // Suppress subscriber errors when Redis is required (handled by retry logic)
-      });
-      this.publisher.on('error', () => {
-        // Suppress publisher errors when Redis is required (handled by retry logic)
-      });
-    } else {
-      // Silently handle Redis connection errors in dev mode (Redis is optional)
-      this.client.on('error', () => {
-        // Suppress error logging when Redis is not configured
-      });
-      this.subscriber.on('error', () => {
-        // Suppress error logging when Redis is not configured
-      });
-      this.publisher.on('error', () => {
-        // Suppress error logging when Redis is not configured
-      });
-    }
-
-    this.logger.log('Redis service initialized', 'RedisService');
+    this.client = this.createMockRedisClient();
+    this.subscriber = this.createMockRedisClient();
+    this.publisher = this.createMockRedisClient();
   }
 
   async onModuleDestroy() {
@@ -359,6 +294,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       hdel: () => Promise.resolve(1),
       sadd: () => Promise.resolve(1),
       srem: () => Promise.resolve(1),
+      sismember: () => Promise.resolve(0),
+      smembers: () => Promise.resolve([]),
+      zadd: () => Promise.resolve(1),
+      zrem: () => Promise.resolve(1),
+      zrangebyscore: () => Promise.resolve([]),
+      zremrangebyscore: () => Promise.resolve(0),
     };
   }
 }

@@ -39,7 +39,7 @@ export class SharedExportController {
     },
   })
   async createSharedExport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Body() dto: any,
   ) {
     return this.sharedExportService.createSharedExport(userId, dto);
@@ -54,15 +54,15 @@ export class SharedExportController {
     description: 'List of shared exports',
   })
   async listSharedExports(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Query('skip') skip: number = 0,
     @Query('take') take: number = 10,
   ) {
     return this.sharedExportService.listSharedExports(userId, skip, take);
   }
 
-  @Get(':token')
-  @ApiOperation({ summary: 'Get shared export details (public or with password)' })
+  @Post(':token/access')
+  @ApiOperation({ summary: 'Access a shared export (with optional password)' })
   @ApiResponse({
     status: 200,
     description: 'Get access to shared export',
@@ -80,6 +80,18 @@ export class SharedExportController {
     @Body('password') password?: string,
   ) {
     return this.sharedExportService.accessSharedExport(shareToken, { password });
+  }
+
+  @Get(':token')
+  @ApiOperation({ summary: 'Get shared export link details (public, no password - returns basic info only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shared export metadata (requires POST :token/access for full access)',
+  })
+  async getSharedExportMetadata(
+    @Param('token') shareToken: string,
+  ) {
+    return this.sharedExportService.getSharedExportMetadata(shareToken);
   }
 
   @Get(':token/details')
@@ -108,7 +120,7 @@ export class SharedExportController {
     },
   })
   async getSharedExportDetails(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('token') shareToken: string,
   ) {
     return this.sharedExportService.getSharedExportDetails(shareToken, userId);
@@ -123,7 +135,7 @@ export class SharedExportController {
     description: 'Shared export updated',
   })
   async updateSharedExport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('token') shareToken: string,
     @Body() dto: any,
   ) {
@@ -140,7 +152,7 @@ export class SharedExportController {
     description: 'Shared export revoked',
   })
   async revokeSharedExport(
-    @GetCurrentUser('sub') userId: string,
+    @GetCurrentUser('userId') userId: string,
     @Param('token') shareToken: string,
   ) {
     return this.sharedExportService.revokeSharedExport(shareToken, userId);

@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useState, useRef, useEffect } from 'react';
 import {
   Button,
   Dialog,
@@ -48,10 +48,20 @@ const ExportButton: FC<ExportButtonProps> = ({
   isCompact = false,
 }) => {
   const [openDialog, setOpenDialog] = useState(false);
-  const [format, setFormat] = useState<'CSV' | 'PDF' | 'XLSX' | 'JSON'>('CSV');
+  const [format, setFormat] = useState<'CSV' | 'PDF' | 'EXCEL' | 'JSON'>('CSV');
   const [exporting, setExporting] = useState(false);
   const [exportJob, setExportJob] = useState<ExportJob | null>(null);
   const { showNotification } = useNotification();
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const downloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeouts on component unmount or dialog close
+  useEffect(() => {
+    return () => {
+      if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
+      if (downloadTimeoutRef.current) clearTimeout(downloadTimeoutRef.current);
+    };
+  }, []);
 
   const formatOptions = [
     { value: 'CSV', label: 'CSV (.csv)' },
@@ -62,6 +72,9 @@ const ExportButton: FC<ExportButtonProps> = ({
 
   const handleOpenDialog = () => setOpenDialog(true);
   const handleCloseDialog = () => {
+    // Clear any pending timeouts
+    if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
+    if (downloadTimeoutRef.current) clearTimeout(downloadTimeoutRef.current);
     setOpenDialog(false);
     setExportJob(null);
   };
@@ -73,7 +86,7 @@ const ExportButton: FC<ExportButtonProps> = ({
       // Request export from backend
       const response = await apiService.export.request({
         type: exportType,
-        format: format as 'CSV' | 'PDF' | 'EXCEL' | 'JSON',
+        format,
         filters,
       });
 
@@ -123,13 +136,13 @@ const ExportButton: FC<ExportButtonProps> = ({
         setExporting(false);
         showNotification?.('Export completed! Ready to download.', 'success');
         // Auto-download after 1s
-        setTimeout(() => handleDownload(jobId), 1000);
+        downloadTimeoutRef.current = setTimeout(() => handleDownload(jobId), 1000);
       } else if (status.status === 'FAILED') {
         setExporting(false);
         showNotification?.(`Export failed: ${status.error}`, 'error');
       } else {
         // Continue polling
-        setTimeout(() => pollExportStatus(jobId, attempts + 1), 1000);
+        pollingTimeoutRef.current = setTimeout(() => pollExportStatus(jobId, attempts + 1), 1000);
       }
     } catch (_error) {
       console.error('Failed to check export status:', _error);

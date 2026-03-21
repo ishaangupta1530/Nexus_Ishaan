@@ -180,19 +180,46 @@ export class ExportProcessor extends WorkerHost {
       const BATCH_SIZE = 100; // Fetch 100 at a time instead of 10,000
       const allReferrals: any[] = [];
 
-      // First, count total records
-      const whereClause: any = {};
+      // Determine access scope based on user role
+      const currentUser = await this.prismaService.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+
+      let accessFilter: any = {};
+      if (!currentUser?.role || currentUser.role !== 'ADMIN') {
+        // Non-admins can only see APPROVED referrals or referrals they posted
+        accessFilter = {
+          OR: [{ status: 'APPROVED' }, { postedById: userId }],
+        };
+      }
+
+      // Build filter conditions from provided filters
+      const filterFilter: any = {};
       if (filters.status) {
-        whereClause.status = filters.status;
+        filterFilter.status = filters.status;
       }
       if (filters.dateRange?.start || filters.dateRange?.end) {
-        whereClause.createdAt = {};
+        filterFilter.createdAt = {};
         if (filters.dateRange.start) {
-          whereClause.createdAt.gte = new Date(filters.dateRange.start);
+          filterFilter.createdAt.gte = new Date(filters.dateRange.start);
         }
         if (filters.dateRange.end) {
-          whereClause.createdAt.lte = new Date(filters.dateRange.end);
+          filterFilter.createdAt.lte = new Date(filters.dateRange.end);
         }
+      }
+
+      // Combine access filter and user-provided filters
+      let whereClause: any = {};
+      const hasAccessFilter = Object.keys(accessFilter).length > 0;
+      const hasFilterFilter = Object.keys(filterFilter).length > 0;
+
+      if (hasAccessFilter && hasFilterFilter) {
+        whereClause = { AND: [accessFilter, filterFilter] };
+      } else if (hasAccessFilter) {
+        whereClause = accessFilter;
+      } else {
+        whereClause = filterFilter;
       }
 
       const total = await this.prismaService.referral.count({ where: whereClause });
@@ -547,50 +574,11 @@ export class ExportProcessor extends WorkerHost {
 
     switch (format.toLowerCase()) {
       case 'csv':
-        // ✅ FIX: removed filename
         return this.csvGenerator.generate(data);
-
       case 'json':
-  if (exportType.toUpperCase() === 'ANALYTICS') {
-    return this.jsonGenerator.generateAnalyticsJson(data, jobData.userId);
-  } else if (exportType.toUpperCase() === 'REFERRALS') {
-    return this.jsonGenerator.generateReferralsJson(data, jobData.userId);
-  } else if (exportType.toUpperCase() === 'CONNECTIONS') {
-    return this.jsonGenerator.generateConnectionsJson(data, jobData.userId);
-  } else if (exportType.toUpperCase() === 'POSTS') {
-    return this.jsonGenerator.generatePostsJson(data, jobData.userId);
-  }
-
-  // ❌ WRONG
-  // return this.jsonGenerator.generate(data);
-
-  // ✅ FIXED
-  return this.jsonGenerator.generate(
-    data,
-    jobData.filename,
-    jobData.userId
-  );
-
-      case 'excel': {
-        let excelBuffer: Buffer;
-
-        if (exportType.toUpperCase() === 'ANALYTICS') {
-          excelBuffer = await this.excelGenerator.generateAnalyticsExcel(data);
-        } else if (exportType.toUpperCase() === 'REFERRALS') {
-          excelBuffer = await this.excelGenerator.generateReferralsExcel(data);
-        } else if (exportType.toUpperCase() === 'CONNECTIONS') {
-          excelBuffer = await this.excelGenerator.generateConnectionsExcel(data);
-        } else if (exportType.toUpperCase() === 'POSTS') {
-          excelBuffer = await this.excelGenerator.generatePostsExcel(data);
-        } else {
-          // ✅ FIX: removed filename
-          excelBuffer = this.excelGenerator.generate(data);
-        }
-
-        return Buffer.isBuffer(excelBuffer)
-          ? excelBuffer
-          : Buffer.from(excelBuffer);
-      }
+        return this.generateJsonBuffer(data, exportType, jobData);
+      case 'excel':
+        return this.generateExcelBuffer(data, exportType);
 
       case 'pdf': {
         const flattenedData = this.prepareDataForPdf(data);
@@ -651,16 +639,13 @@ export class ExportProcessor extends WorkerHost {
               const objValue = value as any;
               if (objValue.name !== undefined) {
                 flattened[newKey] = objValue.name;
-              } else if (objValue.id !== undefined) {
+              } else if (objValue.id) {
                 flattened[newKey] = objValue.id;
               } else {
-                const stringProp = Object.entries(objValue).find(
-                  ([, v]) => typeof v === 'string'
-                );
-                flattened[newKey] = stringProp ? stringProp[1] : '';
+                flattened[newKey] = this.findStringProperty(objValue);
               }
             } else {
-              flattened[newKey] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+              flattened[newKey] = this.serializeValue(value);
             }
           });
         } else {
@@ -676,7 +661,7 @@ export class ExportProcessor extends WorkerHost {
         } else if (typeof value === 'object') {
           flattenValue(value, key);
         } else {
-          flattened[key] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+          flattened[key] = this.serializeValue(value);
         }
       });
 
@@ -710,7 +695,7 @@ export class ExportProcessor extends WorkerHost {
       const filepath = path.join(this.uploadDir, filename);
 
       this.logger.log(`Saving export: format=${format}, extension=${extension}, filename=${filename}`);
-      fs.writeFileSync(filepath, buffer);
+      await fs.promises.writeFile(filepath, buffer);
 
       this.logger.log(`File saved to: ${filepath}`);
       return filepath;
@@ -733,5 +718,69 @@ export class ExportProcessor extends WorkerHost {
       this.logger.error(`Failed to update export job: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Generate JSON buffer based on export type
+   */
+  private generateJsonBuffer(data: any[], exportType: string, jobData: ExportJobData): Buffer {
+    const type = exportType.toUpperCase();
+    switch (type) {
+      case 'ANALYTICS':
+        return this.jsonGenerator.generateAnalyticsJson(data, jobData.userId);
+      case 'REFERRALS':
+        return this.jsonGenerator.generateReferralsJson(data, jobData.userId);
+      case 'CONNECTIONS':
+        return this.jsonGenerator.generateConnectionsJson(data, jobData.userId);
+      case 'POSTS':
+        return this.jsonGenerator.generatePostsJson(data, jobData.userId);
+      default:
+        return this.jsonGenerator.generate(data, jobData.filename, jobData.userId);
+    }
+  }
+
+  /**
+   * Generate Excel buffer based on export type
+   */
+  private async generateExcelBuffer(data: any[], exportType: string): Promise<Buffer> {
+    const type = exportType.toUpperCase();
+    let excelBuffer: Buffer;
+
+    switch (type) {
+      case 'ANALYTICS':
+        excelBuffer = await this.excelGenerator.generateAnalyticsExcel(data);
+        break;
+      case 'REFERRALS':
+        excelBuffer = await this.excelGenerator.generateReferralsExcel(data);
+        break;
+      case 'CONNECTIONS':
+        excelBuffer = await this.excelGenerator.generateConnectionsExcel(data);
+        break;
+      case 'POSTS':
+        excelBuffer = await this.excelGenerator.generatePostsExcel(data);
+        break;
+      default:
+        excelBuffer = this.excelGenerator.generate(data);
+    }
+
+    return Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
+  }
+
+  /**
+   * Find a string property in an object
+   */
+  private findStringProperty(obj: any): string {
+    const entries = Object.entries(obj);
+    const stringEntry = entries.find(([, v]) => typeof v === 'string');
+    return stringEntry ? String(stringEntry[1]) : '';
+  }
+
+  /**
+   * Serialize a value to string
+   */
+  private serializeValue(value: any): string {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
   }
 }
