@@ -29,7 +29,14 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   async connectToRedis(): Promise<void> {
+    const disableRedis = this.configService.get('DISABLE_REDIS', 'false');
     const redisUrl = this.configService.get('REDIS_URL');
+
+    // Skip Redis initialization if explicitly disabled
+    if (disableRedis === 'true') {
+      this.logger.warn('⚠️ Redis disabled - using in-memory Socket.IO adapter');
+      return;
+    }
 
     // Skip Redis initialization if not configured
     if (!redisUrl || redisUrl.trim() === '') {
@@ -40,17 +47,24 @@ export class RedisIoAdapter extends IoAdapter {
     this.logger.log('🔌 Connecting to Redis for Socket.IO adapter...');
 
     try {
-      // Create Redis clients for pub/sub
-      const pubClient = createClient({ url: redisUrl });
+      // Create Redis clients for pub/sub with connection options that prevent auto-retry
+      const pubClient = createClient({
+        url: redisUrl,
+        socket: {
+          reconnectStrategy: () => false, // Don't retry
+        },
+      } as any);
       const subClient = pubClient.duplicate();
 
       // Handle connection events
       pubClient.on('error', (err) => {
-        this.logger.error('❌ Redis Pub Client Error:', err);
+        this.logger.error('❌ Redis Pub Client Error - using in-memory adapter:', err);
+        // Fallback to in-memory adapter
       });
 
       subClient.on('error', (err) => {
-        this.logger.error('❌ Redis Sub Client Error:', err);
+        this.logger.error('❌ Redis Sub Client Error - using in-memory adapter:', err);
+        // Fallback to in-memory adapter
       });
 
       pubClient.on('connect', () => {
@@ -61,13 +75,24 @@ export class RedisIoAdapter extends IoAdapter {
         this.logger.log('✅ Redis Sub Client connected');
       });
 
-      // Connect to Redis
-      await Promise.all([pubClient.connect(), subClient.connect()]);
+      // Try to connect to Redis with timeout and graceful fallback
+      try {
+        // Set a 5-second timeout for connection attempt
+        const connectPromise = Promise.all([pubClient.connect(), subClient.connect()]);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis connection timeout')), 5000),
+        );
+        await Promise.race([connectPromise, timeoutPromise]);
 
-      this.logger.log('🚀 Redis adapter configured successfully');
+        this.logger.log('🚀 Redis adapter configured successfully');
 
-      // Create the adapter
-      this.adapterConstructor = createAdapter(pubClient, subClient);
+        // Create the adapter
+        this.adapterConstructor = createAdapter(pubClient, subClient);
+      } catch (connectError: any) {
+        this.logger.warn('⚠️ Redis connection failed, using in-memory WebSocket adapter:', connectError.message);
+        // Fallback to in-memory adapter - don't set adapterConstructor
+        return;
+      }
     } catch (error) {
       this.logger.error('❌ Failed to connect to Redis:', error);
       this.logger.warn(
