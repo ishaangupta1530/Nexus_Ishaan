@@ -82,23 +82,56 @@ export class NotificationGateway
   }
 
   private initializeRedis(): void {
+    const disableRedis = this.configService.get('DISABLE_REDIS', 'false');
     const redisUrl = this.configService.get('REDIS_URL');
+    
+    // Skip Redis initialization if explicitly disabled
+    if (disableRedis === 'true') {
+      this.logger.warn('⚠️ Notification Gateway: Redis disabled - single-server mode');
+      this.redis = this.createMockRedisClient();
+      return;
+    }
     
     // Skip Redis initialization if not configured
     if (!redisUrl || redisUrl.trim() === '') {
       this.logger.warn('⚠️ Notification Gateway: Redis not configured - single-server mode');
+      // Create mock client
+      this.redis = this.createMockRedisClient();
       return;
     }
     
-    this.redis = new Redis(redisUrl);
+    try {
+      this.redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+        enableOfflineQueue: false,
+        lazyConnect: true, // Never auto-connect
+        retryStrategy: () => false, // Disable retries
+      } as any);
 
-    this.redis.on('connect', () => {
-      this.logger.log('🔗 Notification Gateway: Redis connected');
-    });
+      this.redis.on('error', (err: any) => {
+        this.logger.warn('⚠️ Notification Gateway: Redis unavailable, using mock client:', err.message);
+        this.redis = this.createMockRedisClient();
+      });
 
-    this.redis.on('error', (err) => {
-      this.logger.error('❌ Notification Gateway: Redis error:', err);
-    });
+      this.redis.on('connect', () => {
+        this.logger.log('🔗 Notification Gateway: Redis connected');
+      });
+    } catch (error) {
+      this.logger.error('Failed to initialize Notification Gateway Redis:', error);
+      this.redis = this.createMockRedisClient();
+    }
+  }
+
+  private createMockRedisClient(): any {
+    return {
+      lpush: async () => 1,
+      del: async () => 1,
+      setex: async () => 'OK',
+      get: async () => null,
+      incr: async () => 1,
+      on: () => {},
+    };
   }
 
   afterInit(): void {
@@ -152,7 +185,10 @@ export class NotificationGateway
           if (!this.connectedUsers.has(client.userId)) {
             this.connectedUsers.set(client.userId, new Set());
           }
-          this.connectedUsers.get(client.userId)!.add(client);
+          const userSockets = this.connectedUsers.get(client.userId);
+          if (userSockets) {
+            userSockets.add(client);
+          }
           this.socketToUser.set(client.id, client.userId);
 
           // Join user-specific room
@@ -171,7 +207,7 @@ export class NotificationGateway
           });
 
           this.logger.log(
-            `✅ Notification client authenticated: ${client.userId} (${this.connectedUsers.get(client.userId)!.size} device(s))`,
+            `✅ Notification client authenticated: ${client.userId} (${this.connectedUsers.get(client.userId)?.size ?? 0} device(s))`,
           );
         } catch (error) {
           this.logger.error(
@@ -539,7 +575,8 @@ export class NotificationGateway
           `📬 Delivering ${notifications.length} pending notifications to ${userId}`,
         );
 
-        for (const notifStr of notifications.reverse()) {
+        const reversedNotifications = notifications.slice().reverse();
+        for (const notifStr of reversedNotifications) {
           const notification = JSON.parse(notifStr);
           client.emit('notification:new', notification);
         }
