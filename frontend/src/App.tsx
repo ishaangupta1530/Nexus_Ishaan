@@ -56,6 +56,7 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const EventsPage = lazy(() => import('./pages/Events/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/Events/EventDetailPage'));
 const CreateEventPage = lazy(() => import('./pages/Admin/CreateEventPage'));
+const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
 
 const RouteUnavailable = lazy(() => import('./pages/RouteUnavailable'));
 
@@ -575,17 +576,16 @@ const LayoutContent: FC = () => {
                   }
                 />
 
-                {/* Add more admin routes here with lazy loading as needed */}
-                {/* <Route
-              path="/admin/analytics"
-              element={
-                <AdminRoute>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <AdminAnalyticsPage />
-                  </Suspense>
-                </AdminRoute>
-              }
-            /> */}
+                <Route
+                  path="/admin/analytics"
+                  element={
+                    <AdminRoute>
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <AdminAnalyticsPage />
+                      </Suspense>
+                    </AdminRoute>
+                  }
+                />
                 <Route path="*" element={<RouteUnavailable />} />
               </Routes>
             </Suspense>

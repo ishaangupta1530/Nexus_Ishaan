@@ -11,11 +11,27 @@ import { UpdateConnectionStatusDto } from './dto/connection.dto';
 import { NotificationService } from 'src/notification/notification.service';
 import { WinstonLoggerService } from 'src/common/logger/winston-logger.service';
 
+type ConnectionAnalyticsPeriod = '7d' | '30d' | '90d' | '1y';
+
+type GrowthBucket = {
+  label: string;
+  bucketStart: string;
+  newConnections: number;
+  totalConnections: number;
+};
+
 /**
  * Service for managing user connections, including sending/accepting requests, and retrieving connection data.
  */
 @Injectable()
 export class ConnectionService {
+  private static readonly PERIOD_TO_DAYS: Record<ConnectionAnalyticsPeriod, number> = {
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+    '1y': 365,
+  };
+
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
@@ -828,6 +844,412 @@ export class ConnectionService {
       },
       recent30Days: recentConnections,
     };
+  }
+
+  async getConnectionGrowthAnalytics(
+    userId: string,
+    period: ConnectionAnalyticsPeriod = '30d',
+  ) {
+    const normalizedPeriod = this.normalizePeriod(period);
+    const days = ConnectionService.PERIOD_TO_DAYS[normalizedPeriod];
+
+    const endDate = new Date();
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - (days - 1));
+    startDate.setHours(0, 0, 0, 0);
+
+    const previousEnd = new Date(startDate);
+    previousEnd.setMilliseconds(previousEnd.getMilliseconds() - 1);
+    const previousStart = new Date(previousEnd);
+    previousStart.setDate(previousStart.getDate() - (days - 1));
+    previousStart.setHours(0, 0, 0, 0);
+
+    const [totalConnections, periodConnections, previousPeriodCount] =
+      await Promise.all([
+        this.prisma.connection.count({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: 'ACCEPTED',
+          },
+        }),
+        this.prisma.connection.findMany({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: 'ACCEPTED',
+            createdAt: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.connection.count({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: 'ACCEPTED',
+            createdAt: {
+              gte: previousStart,
+              lte: previousEnd,
+            },
+          },
+        }),
+      ]);
+
+    const buckets = this.buildGrowthBuckets(
+      periodConnections.map((item) => item.createdAt),
+      startDate,
+      normalizedPeriod,
+      totalConnections,
+    );
+
+    const newConnections = periodConnections.length;
+    const growthRate =
+      previousPeriodCount === 0
+        ? newConnections > 0
+          ? 100
+          : 0
+        : ((newConnections - previousPeriodCount) / previousPeriodCount) * 100;
+
+    return {
+      userId,
+      period: normalizedPeriod,
+      granularity: this.getGranularity(normalizedPeriod),
+      metrics: {
+        totalConnections,
+        newConnections,
+        previousPeriodConnections: previousPeriodCount,
+        growthRate: Math.round(growthRate * 100) / 100,
+        velocity:
+          buckets.length > 0
+            ? Math.round((newConnections / buckets.length) * 100) / 100
+            : 0,
+      },
+      data: buckets,
+    };
+  }
+
+  async getConnectionDistributionAnalytics(userId: string) {
+    const connections = await this.prisma.connection.findMany({
+      where: {
+        OR: [{ requesterId: userId }, { recipientId: userId }],
+        status: 'ACCEPTED',
+      },
+      select: {
+        requesterId: true,
+        recipientId: true,
+        requester: {
+          select: {
+            role: true,
+            graduationYear: true,
+            profile: {
+              select: {
+                year: true,
+                location: true,
+              },
+            },
+          },
+        },
+        recipient: {
+          select: {
+            role: true,
+            graduationYear: true,
+            profile: {
+              select: {
+                year: true,
+                location: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const byRole: Record<string, number> = {};
+    const byGraduationYear: Record<string, number> = {};
+    const byLocation: Record<string, number> = {};
+
+    connections.forEach((connection) => {
+      const otherUser =
+        connection.requesterId === userId
+          ? connection.recipient
+          : connection.requester;
+
+      const role = otherUser.role || 'UNKNOWN';
+      byRole[role] = (byRole[role] || 0) + 1;
+
+      const graduationYear =
+        otherUser.graduationYear?.toString() ||
+        otherUser.profile?.year ||
+        'Not Specified';
+      byGraduationYear[graduationYear] =
+        (byGraduationYear[graduationYear] || 0) + 1;
+
+      const location = otherUser.profile?.location || 'Not Specified';
+      byLocation[location] = (byLocation[location] || 0) + 1;
+    });
+
+    const totalConnections = connections.length;
+
+    return {
+      userId,
+      totalConnections,
+      byRole: Object.entries(byRole)
+        .map(([role, count]) => ({
+          role,
+          count,
+          percentage:
+            totalConnections > 0
+              ? Math.round((count / totalConnections) * 10000) / 100
+              : 0,
+        }))
+        .sort((a, b) => b.count - a.count),
+      byGraduationYear: Object.entries(byGraduationYear)
+        .map(([year, count]) => ({ year, count }))
+        .sort((a, b) => b.count - a.count),
+      byLocation: Object.entries(byLocation)
+        .map(([location, count]) => ({ location, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }
+
+  async getNetworkStrengthScore(userId: string) {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const sixtyDaysAgo = new Date(now);
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const [distribution, activeUserCount, recentConnections, prevConnections, pendingReceived] =
+      await Promise.all([
+        this.getConnectionDistributionAnalytics(userId),
+        this.prisma.user.count({ where: { isAccountActive: true } }),
+        this.prisma.connection.count({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: 'ACCEPTED',
+            createdAt: { gte: thirtyDaysAgo, lte: now },
+          },
+        }),
+        this.prisma.connection.count({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: 'ACCEPTED',
+            createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+          },
+        }),
+        this.prisma.connection.findMany({
+          where: {
+            recipientId: userId,
+            status: 'PENDING',
+          },
+          select: { createdAt: true },
+        }),
+      ]);
+
+    const totalConnections = distribution.totalConnections;
+    const velocity = Math.round((recentConnections / 30) * 100) / 100;
+
+    const growthRate =
+      prevConnections === 0
+        ? recentConnections > 0
+          ? 100
+          : 0
+        : ((recentConnections - prevConnections) / prevConnections) * 100;
+
+    const roleCategories = distribution.byRole.filter((item) => item.count > 0)
+      .length;
+    const roleDiversity = Math.min((roleCategories / 4) * 100, 100);
+
+    const knownLocations = distribution.byLocation.filter(
+      (item) => item.location !== 'Not Specified',
+    ).length;
+    const locationDiversity = Math.min((knownLocations / 10) * 100, 100);
+
+    const networkDensity =
+      activeUserCount > 1
+        ? Math.min((totalConnections / (activeUserCount - 1)) * 100, 100)
+        : 0;
+
+    const avgResponseHours =
+      pendingReceived.length > 0
+        ? pendingReceived.reduce((sum, request) => {
+            const ageInHours =
+              (now.getTime() - new Date(request.createdAt).getTime()) /
+              (1000 * 60 * 60);
+            return sum + ageInHours;
+          }, 0) / pendingReceived.length
+        : 0;
+
+    const sizeScore = Math.min((totalConnections / 100) * 100, 100);
+    const diversityScore = (roleDiversity + locationDiversity) / 2;
+    const velocityScore = Math.min((velocity / 3) * 100, 100);
+    const growthScore = Math.max(0, Math.min(100, (growthRate + 100) / 2));
+
+    const score = Math.round(
+      sizeScore * 0.35 +
+        diversityScore * 0.25 +
+        velocityScore * 0.2 +
+        growthScore * 0.1 +
+        networkDensity * 0.1,
+    );
+
+    return {
+      userId,
+      score,
+      metrics: {
+        totalConnections,
+        growthRate: Math.round(growthRate * 100) / 100,
+        velocity,
+        networkDensity: Math.round(networkDensity * 100) / 100,
+        roleDiversity: Math.round(roleDiversity * 100) / 100,
+        locationDiversity: Math.round(locationDiversity * 100) / 100,
+        averageResponseTimeHours: Math.round(avgResponseHours * 100) / 100,
+      },
+      interpretation:
+        score >= 75
+          ? 'Strong network with healthy growth and good diversity.'
+          : score >= 50
+            ? 'Moderate network strength with room to improve growth or diversity.'
+            : 'Early-stage network. Increase consistent connections and diversify your network.',
+    };
+  }
+
+  private normalizePeriod(period?: string): ConnectionAnalyticsPeriod {
+    if (!period) {
+      return '30d';
+    }
+
+    return (['7d', '30d', '90d', '1y'] as ConnectionAnalyticsPeriod[]).includes(
+      period as ConnectionAnalyticsPeriod,
+    )
+      ? (period as ConnectionAnalyticsPeriod)
+      : '30d';
+  }
+
+  private getGranularity(period: ConnectionAnalyticsPeriod) {
+    if (period === '7d' || period === '30d') {
+      return 'daily';
+    }
+    if (period === '90d') {
+      return 'weekly';
+    }
+    return 'monthly';
+  }
+
+  private buildGrowthBuckets(
+    createdAtDates: Date[],
+    startDate: Date,
+    period: ConnectionAnalyticsPeriod,
+    totalConnections: number,
+  ): GrowthBucket[] {
+    const granularity = this.getGranularity(period);
+    const bucketCounts = new Map<string, number>();
+
+    createdAtDates.forEach((date) => {
+      const key = this.toBucketKey(date, granularity);
+      bucketCounts.set(key, (bucketCounts.get(key) || 0) + 1);
+    });
+
+    const bucketStarts = this.generateBucketStarts(startDate, period, granularity);
+    const periodConnectionCount = createdAtDates.length;
+    let runningTotal = totalConnections - periodConnectionCount;
+
+    return bucketStarts.map((bucketStart) => {
+      const key = this.toBucketKey(bucketStart, granularity);
+      const newConnections = bucketCounts.get(key) || 0;
+      runningTotal += newConnections;
+
+      return {
+        label: this.formatBucketLabel(bucketStart, granularity),
+        bucketStart: bucketStart.toISOString(),
+        newConnections,
+        totalConnections: runningTotal,
+      };
+    });
+  }
+
+  private generateBucketStarts(
+    startDate: Date,
+    period: ConnectionAnalyticsPeriod,
+    granularity: 'daily' | 'weekly' | 'monthly',
+  ) {
+    const starts: Date[] = [];
+
+    if (granularity === 'daily') {
+      const totalDays = ConnectionService.PERIOD_TO_DAYS[period];
+      for (let i = 0; i < totalDays; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        date.setHours(0, 0, 0, 0);
+        starts.push(date);
+      }
+      return starts;
+    }
+
+    if (granularity === 'weekly') {
+      const weeklyBuckets = Math.ceil(
+        ConnectionService.PERIOD_TO_DAYS[period] / 7,
+      );
+      for (let i = 0; i < weeklyBuckets; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i * 7);
+        date.setHours(0, 0, 0, 0);
+        starts.push(date);
+      }
+      return starts;
+    }
+
+    const currentMonthStart = new Date(startDate);
+    currentMonthStart.setDate(1);
+    currentMonthStart.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 12; i++) {
+      const month = new Date(currentMonthStart);
+      month.setMonth(currentMonthStart.getMonth() + i);
+      starts.push(month);
+    }
+
+    return starts;
+  }
+
+  private toBucketKey(date: Date, granularity: 'daily' | 'weekly' | 'monthly') {
+    const normalized = new Date(date);
+
+    if (granularity === 'daily') {
+      normalized.setHours(0, 0, 0, 0);
+      return normalized.toISOString().split('T')[0];
+    }
+
+    if (granularity === 'weekly') {
+      normalized.setHours(0, 0, 0, 0);
+      const day = normalized.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      normalized.setDate(normalized.getDate() + diff);
+      return normalized.toISOString().split('T')[0];
+    }
+
+    normalized.setHours(0, 0, 0, 0);
+    normalized.setDate(1);
+    return `${normalized.getFullYear()}-${String(normalized.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private formatBucketLabel(
+    date: Date,
+    granularity: 'daily' | 'weekly' | 'monthly',
+  ) {
+    if (granularity === 'daily') {
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+
+    if (granularity === 'weekly') {
+      return `Wk ${Math.ceil(date.getDate() / 7)} ${date.toLocaleString('en-US', {
+        month: 'short',
+      })}`;
+    }
+
+    return date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
   }
 
   /**

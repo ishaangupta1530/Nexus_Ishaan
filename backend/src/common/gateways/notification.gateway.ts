@@ -305,38 +305,8 @@ export class NotificationGateway
         // User is offline - queue notification
         await this.queueNotification(userId, notificationData);
 
-        // Send FCM push notification
-        const user = await this.prismaService.user.findUnique({
-          where: { id: userId },
-          select: { fcmDeviceToken: true },
-        });
-
-        if (user?.fcmDeviceToken) {
-          try {
-            await this.fcmService.sendNotification(
-              user.fcmDeviceToken,
-              {
-                title,
-                body: message,
-              },
-              {
-                notificationId: notification.id,
-                type,
-                ...data,
-              },
-            );
-
-            this.logger.log(`📱 FCM push notification sent to ${userId}`);
-          } catch (fcmError) {
-            if (fcmError.message === 'INVALID_TOKEN') {
-              await this.prismaService.user.update({
-                where: { id: userId },
-                data: { fcmDeviceToken: null },
-              });
-            }
-            this.logger.error('❌ FCM notification failed:', fcmError);
-          }
-        }
+        // FCM feature disabled - using WebSocket/queue only
+        this.logger.debug(`FCM feature disabled - skipped for user ${userId}`);
 
         this.logger.log(
           `💾 Notification queued for offline user ${userId}: ${type}`,

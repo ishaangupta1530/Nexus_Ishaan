@@ -39,10 +39,10 @@ export class PushNotificationService {
     },
   ): Promise<boolean> {
     try {
-      // Get user's FCM token
+      // Verify user exists
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { fcmDeviceToken: true, email: true, name: true },
+        select: { email: true, name: true },
       });
 
       if (!user) {
@@ -75,15 +75,7 @@ export class PushNotificationService {
         this.logger.log(`WebSocket notification sent to user ${userId}`);
       }
 
-      // Send via FCM if token exists
-      if (user.fcmDeviceToken) {
-        const fcmSent = await this.sendFCM(user.fcmDeviceToken, notification);
-        if (fcmSent) {
-          this.logger.log(`FCM notification sent to user ${userId}`);
-          return true;
-        }
-      }
-
+      // FCM feature disabled - using WebSocket only
       return true;
     } catch (error) {
       this.logger.error(
@@ -205,69 +197,37 @@ export class PushNotificationService {
       return true;
     } catch (error) {
       this.logger.error('FCM send failed:', error);
-
-      // If token is invalid, remove it from database
-      if (error.code === 'messaging/invalid-registration-token') {
-        await this.removeInvalidToken(token);
-      }
-
       return false;
     }
   }
 
   /**
    * Remove invalid FCM token from database
+   * @deprecated FCM feature disabled
    */
   private async removeInvalidToken(token: string): Promise<void> {
-    try {
-      await this.prisma.user.updateMany({
-        where: { fcmDeviceToken: token },
-        data: { fcmDeviceToken: null },
-      });
-      this.logger.log(`Removed invalid FCM token: ${token}`);
-    } catch (error) {
-      this.logger.error('Failed to remove invalid token:', error);
-    }
+    // FCM feature disabled - no-op
+    this.logger.debug(`FCM token removal requested (feature disabled): ${token}`);
   }
 
   /**
    * Register FCM token for a user
+   * @deprecated FCM feature disabled
    */
   async registerDeviceToken(userId: string, token: string): Promise<boolean> {
-    try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { fcmDeviceToken: token },
-      });
-      this.logger.log(`FCM token registered for user ${userId}`);
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to register FCM token for user ${userId}:`,
-        error,
-      );
-      return false;
-    }
+    // FCM feature disabled - no-op (keep method for backward compatibility)
+    this.logger.debug(`FCM token registration requested for user ${userId} (feature disabled)`);
+    return true;
   }
 
   /**
    * Unregister FCM token for a user
+   * @deprecated FCM feature disabled
    */
   async unregisterDeviceToken(userId: string): Promise<boolean> {
-    try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { fcmDeviceToken: null },
-      });
-      this.logger.log(`FCM token unregistered for user ${userId}`);
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to unregister FCM token for user ${userId}:`,
-        error,
-      );
-      return false;
-    }
+    // FCM feature disabled - no-op (keep method for backward compatibility)
+    this.logger.debug(`FCM token unregistration requested for user ${userId} (feature disabled)`);
+    return true;
   }
 
   /**

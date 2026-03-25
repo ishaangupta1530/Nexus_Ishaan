@@ -69,9 +69,6 @@ export class DocumentVerificationService {
       limit = 20,
       sortBy = SortBy.SUBMITTED_AT,
       sortOrder = 'asc',
-      graduationYear,
-      graduationYearFrom,
-      graduationYearTo,
       role,
       searchName,
       searchEmail,
@@ -97,20 +94,6 @@ export class DocumentVerificationService {
     // User table filters
     if (role) {
       where.user.role = role.toUpperCase();
-    }
-
-    if (graduationYear) {
-      where.user.graduationYear = graduationYear;
-    }
-
-    if (graduationYearFrom || graduationYearTo) {
-      where.user.graduationYear = {};
-      if (graduationYearFrom) {
-        where.user.graduationYear.gte = graduationYearFrom;
-      }
-      if (graduationYearTo) {
-        where.user.graduationYear.lte = graduationYearTo;
-      }
     }
 
     if (searchName) {
@@ -206,7 +189,7 @@ export class DocumentVerificationService {
         orderBy.user = { name: sortOrder };
         break;
       case SortBy.GRADUATION_YEAR:
-        orderBy.user = { graduationYear: sortOrder };
+        orderBy.submittedAt = sortOrder; // Fallback (graduationYear field removed)
         break;
       case SortBy.ROLE:
         orderBy.user = { role: sortOrder };
@@ -236,7 +219,6 @@ export class DocumentVerificationService {
               email: true,
               name: true,
               role: true,
-              graduationYear: true,
               createdAt: true,
               accountStatus: true,
               iconUrl: true,
@@ -300,10 +282,10 @@ export class DocumentVerificationService {
           user: {
             select: {
               role: true,
-              graduationYear: true,
               profile: {
                 select: {
                   dept: true,
+                  year: true,
                 },
               },
             },
@@ -329,7 +311,7 @@ export class DocumentVerificationService {
       // By Graduation Year
       const byGraduationYear: Record<string, number> = {};
       allPending.forEach((doc) => {
-        const year = doc.user.graduationYear?.toString() || 'Not Specified';
+        const year = doc.user.profile?.year?.toString() || 'Not Specified';
         byGraduationYear[year] = (byGraduationYear[year] || 0) + 1;
       });
 

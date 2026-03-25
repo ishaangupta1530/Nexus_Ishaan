@@ -254,53 +254,53 @@ export class UserService {
 
   /**
    * Registers a Firebase Cloud Messaging (FCM) device token for a user.
+   * @deprecated FCM feature disabled
    * @param userId - The ID of the user.
    * @param deviceToken - The FCM device token from the client.
    * @returns A promise that resolves to the updated user object.
    */
   async registerFcmToken(userId: string, deviceToken: string) {
-    this.logger.log(`📱 Registering FCM token for user ${userId}`);
+    this.logger.debug(
+      `FCM token registration requested for user ${userId} (feature disabled)`,
+    );
 
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      data: { fcmDeviceToken: deviceToken },
       select: {
         id: true,
         name: true,
         email: true,
-        fcmDeviceToken: true,
       },
     });
 
     // Invalidate user cache
     await this.cacheService.invalidateUser(userId);
-    this.logger.log(`✅ FCM token registered for user ${userId}`);
 
     return user;
   }
 
   /**
    * Unregisters the Firebase Cloud Messaging (FCM) device token for a user.
+   * @deprecated FCM feature disabled
    * @param userId - The ID of the user.
    * @returns A promise that resolves to the updated user object.
    */
   async unregisterFcmToken(userId: string) {
-    this.logger.log(`📱 Unregistering FCM token for user ${userId}`);
+    this.logger.debug(
+      `FCM token unregistration requested for user ${userId} (feature disabled)`,
+    );
 
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      data: { fcmDeviceToken: null },
       select: {
         id: true,
         name: true,
         email: true,
-        fcmDeviceToken: true,
       },
     });
 
     // Invalidate user cache
     await this.cacheService.invalidateUser(userId);
-    this.logger.log(`✅ FCM token unregistered for user ${userId}`);
 
     return user;
   }

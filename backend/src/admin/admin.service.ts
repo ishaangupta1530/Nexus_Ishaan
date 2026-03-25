@@ -221,7 +221,6 @@ export class AdminService {
           email: true,
           name: true,
           role: true,
-          graduationYear: true,
           accountStatus: true,
           isAccountActive: true,
           createdAt: true,

@@ -437,44 +437,12 @@ export class FastChatGateway
 
     const recipient = await this.prismaService.user.findUnique({
       where: { id: receiverUserId },
-      select: { fcmDeviceToken: true, name: true },
+      select: { name: true },
     });
 
-    if (!recipient?.fcmDeviceToken) {
-      this.logger.log(`ℹ️ No FCM token registered for user ${receiverUserId}`);
-      return;
-    }
-
-    try {
-      const sender = await this.prismaService.user.findUnique({
-        where: { id: senderUserId },
-        select: { name: true },
-      });
-
-      await this.fcmService.sendMessageNotification(
-        recipient.fcmDeviceToken,
-        sender?.name || 'Someone',
-        messageContent,
-        messageId,
-      );
-
-      this.logger.log(`✅ Push notification sent to ${receiverUserId}`);
-    } catch (fcmError) {
-      if ((fcmError as Error).message === 'INVALID_TOKEN') {
-        this.logger.warn(
-          `⚠️ Removing invalid FCM token for user ${receiverUserId}`,
-        );
-        await this.prismaService.user.update({
-          where: { id: receiverUserId },
-          data: { fcmDeviceToken: null },
-        });
-      } else {
-        this.logger.error(
-          '❌ Failed to send push notification:',
-          fcmError instanceof Error ? fcmError.message : 'Unknown error',
-        );
-      }
-    }
+    this.logger.log(
+      `ℹ️ FCM feature disabled - push notification skipped for user ${receiverUserId}`,
+    );
   }
 
   @SubscribeMessage('TYPING_START')
