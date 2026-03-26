@@ -5,6 +5,7 @@ import {
   AreaChart,
   CartesianGrid,
   Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,9 +16,13 @@ import { type ConnectionGrowthResponse } from '@/services/connectionAnalyticsSer
 
 interface ConnectionGrowthChartProps {
   growth: ConnectionGrowthResponse;
+  chartType?: 'area' | 'line';
 }
 
-const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({ growth }) => {
+const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
+  growth,
+  chartType = 'area',
+}) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -51,39 +56,67 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({ growth }) => {
           </Stack>
 
           <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={growth.data}>
-              <defs>
-                <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.03} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" />
-              <YAxis allowDecimals={false} />
-              <Tooltip
-                formatter={(value, key) => {
-                  if (key === 'newConnections') return [value, 'New Connections'];
-                  if (key === 'totalConnections') return [value, 'Total Connections'];
-                  return [value, String(key)];
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="newConnections"
-                stroke="#0ea5e9"
-                fillOpacity={1}
-                fill="url(#growthFill)"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="totalConnections"
-                stroke="#0f172a"
-                strokeWidth={2.5}
-                dot={{ r: 2 }}
-              />
-            </AreaChart>
+            {chartType === 'line' ? (
+              <LineChart data={growth.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="label" />
+                <YAxis allowDecimals={false} />
+                <Tooltip
+                  formatter={(value, key) => {
+                    if (key === 'newConnections') return [value, 'New Connections'];
+                    if (key === 'totalConnections') return [value, 'Total Connections'];
+                    return [value, String(key)];
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="newConnections"
+                  stroke="#0ea5e9"
+                  strokeWidth={2.5}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="totalConnections"
+                  stroke="#0f172a"
+                  strokeWidth={2.5}
+                  dot={{ r: 2 }}
+                />
+              </LineChart>
+            ) : (
+              <AreaChart data={growth.data}>
+                <defs>
+                  <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="label" />
+                <YAxis allowDecimals={false} />
+                <Tooltip
+                  formatter={(value, key) => {
+                    if (key === 'newConnections') return [value, 'New Connections'];
+                    if (key === 'totalConnections') return [value, 'Total Connections'];
+                    return [value, String(key)];
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="newConnections"
+                  stroke="#0ea5e9"
+                  fillOpacity={1}
+                  fill="url(#growthFill)"
+                  strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="totalConnections"
+                  stroke="#0f172a"
+                  strokeWidth={2.5}
+                  dot={{ r: 2 }}
+                />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </CardContent>
       </Card>

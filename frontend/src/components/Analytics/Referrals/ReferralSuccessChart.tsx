@@ -10,6 +10,8 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  Bar,
+  BarChart,
   Line,
   LineChart,
   CartesianGrid,
@@ -26,12 +28,14 @@ interface ReferralSuccessChartProps {
   conversion: ReferralConversionResponse;
   selectedIndustry: string;
   onIndustryChange: (industry: string) => void;
+  chartType?: 'line' | 'bar';
 }
 
 const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
   conversion,
   selectedIndustry,
   onIndustryChange,
+  chartType = 'line',
 }) => {
   const industries = useMemo(
     () => conversion.successByIndustry.map((item) => item.industry),
@@ -115,26 +119,39 @@ const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
 
           <Box sx={{ height: 340 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="industry" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="posted" stroke="#1976d2" name="Posted" />
-                <Line
-                  type="monotone"
-                  dataKey="successful"
-                  stroke="#2e7d32"
-                  name="Successful"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="successRate"
-                  stroke="#ed6c02"
-                  name="Success Rate %"
-                />
-              </LineChart>
+              {chartType === 'bar' ? (
+                <BarChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="industry" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="posted" fill="#1976d2" name="Posted" />
+                  <Bar dataKey="successful" fill="#2e7d32" name="Successful" />
+                  <Bar dataKey="successRate" fill="#ed6c02" name="Success Rate %" />
+                </BarChart>
+              ) : (
+                <LineChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="industry" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="posted" stroke="#1976d2" name="Posted" />
+                  <Line
+                    type="monotone"
+                    dataKey="successful"
+                    stroke="#2e7d32"
+                    name="Successful"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="successRate"
+                    stroke="#ed6c02"
+                    name="Success Rate %"
+                  />
+                </LineChart>
+              )}
             </ResponsiveContainer>
           </Box>
         </Stack>
