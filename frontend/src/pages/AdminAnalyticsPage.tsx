@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -12,6 +12,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
+import Divider from '@mui/material/Divider';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '@/services/api';
 import connectionAnalyticsService, {
@@ -45,6 +46,10 @@ import ReferralMetricsCard from '@/components/Analytics/Referrals/ReferralMetric
 import ApplicationFunnelChart from '@/components/Analytics/Referrals/ApplicationFunnelChart';
 import ReferralSuccessChart from '@/components/Analytics/Referrals/ReferralSuccessChart';
 import MentorshipDashboard from '@/components/Analytics/Referrals/MentorshipDashboard';
+import RealtimeIndicator from '@/components/Analytics/RealtimeIndicator';
+import RefreshButton from '@/components/Analytics/RefreshButton';
+import LastUpdatedBadge from '@/components/Analytics/LastUpdatedBadge';
+import UpdateAnimation from '@/components/Analytics/UpdateAnimation';
 
 const PERIOD_OPTIONS: Array<{ label: string; value: ConnectionAnalyticsPeriod }> = [
   { label: 'Last 7 Days', value: '7d' },
@@ -69,8 +74,15 @@ type AdminUserOption = {
 
 type TabType = 'connections' | 'engagement' | 'referrals';
 
+const AUTO_REFRESH_OPTIONS = [
+  { label: 'Off',     value: 0   },
+  { label: '30 sec',  value: 30  },
+  { label: '1 min',   value: 60  },
+  { label: '5 min',   value: 300 },
+] as const;
+
 const AdminAnalyticsPage: FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('connections');
@@ -103,6 +115,12 @@ const AdminAnalyticsPage: FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Real-time / refresh state
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (user?.id) {
       setTargetUserId(user.id);
@@ -134,13 +152,13 @@ const AdminAnalyticsPage: FC = () => {
   }, [user?.role]);
 
   // Load connection analytics
-  const loadConnectionAnalytics = useCallback(async () => {
+  const loadConnectionAnalytics = useCallback(async (silent = false) => {
     if (!targetUserId) {
       setError('Target user ID is required to fetch analytics.');
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -153,6 +171,7 @@ const AdminAnalyticsPage: FC = () => {
       setGrowth(growthRes.data);
       setDistribution(distributionRes.data);
       setStrength(strengthRes.data);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to load connection analytics', err);
       setError('Failed to load analytics. Ensure your admin token is valid and try again.');
@@ -162,13 +181,13 @@ const AdminAnalyticsPage: FC = () => {
   }, [period, targetUserId]);
 
   // Load engagement analytics
-  const loadEngagementAnalytics = useCallback(async () => {
+  const loadEngagementAnalytics = useCallback(async (silent = false) => {
     if (!targetUserId) {
       setError('Target user ID is required to fetch analytics.');
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -195,6 +214,7 @@ const AdminAnalyticsPage: FC = () => {
       ) {
         throw new Error('All engagement analytics requests failed');
       }
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to load engagement analytics', err);
       setError('Failed to load engagement analytics. Ensure your admin token is valid and try again.');
@@ -203,13 +223,13 @@ const AdminAnalyticsPage: FC = () => {
     }
   }, [targetUserId, engagementPeriod, heatmapYear, contentPerfPage]);
 
-  const loadReferralMentorshipAnalytics = useCallback(async () => {
+  const loadReferralMentorshipAnalytics = useCallback(async (silent = false) => {
     if (!targetUserId) {
       setError('Target user ID is required to fetch analytics.');
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -242,6 +262,7 @@ const AdminAnalyticsPage: FC = () => {
       ) {
         throw new Error('All referral and mentorship analytics requests failed');
       }
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to load referral and mentorship analytics', err);
       setError('Failed to load referral and mentorship analytics. Ensure your admin token is valid and try again.');
@@ -267,6 +288,34 @@ const AdminAnalyticsPage: FC = () => {
       void loadReferralMentorshipAnalytics();
     }
   }, [targetUserId, activeTab, loadReferralMentorshipAnalytics]);
+
+  // Silent (non-blocking) refresh for auto-refresh and WS-triggered updates
+  const silentRefreshCurrentTab = useCallback(async () => {
+    if (!targetUserId) return;
+    if (activeTab === 'connections') await loadConnectionAnalytics(true);
+    else if (activeTab === 'engagement') await loadEngagementAnalytics(true);
+    else await loadReferralMentorshipAnalytics(true);
+  }, [activeTab, targetUserId, loadConnectionAnalytics, loadEngagementAnalytics, loadReferralMentorshipAnalytics]);
+
+  // Manual refresh handler — shows button spinner, NOT the page overlay
+  const handleManualRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await silentRefreshCurrentTab();
+    setIsRefreshing(false);
+  }, [silentRefreshCurrentTab]);
+
+  // Auto-refresh interval effect
+  useEffect(() => {
+    if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    if (autoRefreshInterval > 0) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        void silentRefreshCurrentTab();
+      }, autoRefreshInterval * 1_000);
+    }
+    return () => {
+      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    };
+  }, [autoRefreshInterval, silentRefreshCurrentTab]);
 
   const connectionMetrics = useMemo(() => {
     if (!growth || !strength || !distribution) {
@@ -304,13 +353,63 @@ const AdminAnalyticsPage: FC = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack spacing={2} sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          Admin Analytics Dashboard
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Comprehensive analytics for connections, engagement, and performance metrics.
-        </Typography>
+      {/* ── Page header ─────────────────────────────── */}
+      <Stack spacing={1} sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 800 }}>
+              Admin Analytics Dashboard
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Comprehensive analytics for connections, engagement, and performance metrics.
+            </Typography>
+          </Box>
+
+          {/* Real-time toolbar */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              flexWrap: 'wrap',
+              mt: { xs: 1, md: 0 },
+            }}
+          >
+            {user?.id && token ? (
+              <RealtimeIndicator
+                userId={user.id}
+                token={token}
+                onAnalyticsUpdate={() => { void silentRefreshCurrentTab(); }}
+              />
+            ) : null}
+
+            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+
+            <TextField
+              select
+              size="small"
+              label="Auto-refresh"
+              value={autoRefreshInterval}
+              onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+              sx={{ width: 110 }}
+              inputProps={{ 'aria-label': 'Auto-refresh interval' }}
+            >
+              {AUTO_REFRESH_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <RefreshButton
+              onRefresh={() => { void handleManualRefresh(); }}
+              isLoading={isRefreshing}
+              disabled={!targetUserId}
+            />
+
+            <LastUpdatedBadge lastUpdated={lastUpdated} />
+          </Box>
+        </Box>
       </Stack>
 
       {/* Tab navigation */}
@@ -392,6 +491,43 @@ const AdminAnalyticsPage: FC = () => {
       {/* Connection Analytics Tab */}
       {!loading && activeTab === 'connections' && growth && distribution && strength ? (
         <Stack spacing={3}>
+          {/* Animated summary row */}
+          <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', pb: 0.5 }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                Total Connections
+              </Typography>
+              <UpdateAnimation
+                value={growth.metrics.totalConnections}
+                variant="h5"
+                sx={{ fontWeight: 700 }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                Growth Rate
+              </Typography>
+              <UpdateAnimation
+                value={growth.metrics.growthRate}
+                decimals={1}
+                suffix="%"
+                variant="h5"
+                sx={{ fontWeight: 700 }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                Strength Score
+              </Typography>
+              <UpdateAnimation
+                value={typeof strength.score === 'number' ? strength.score : parseFloat(String(strength.score))}
+                decimals={1}
+                variant="h5"
+                sx={{ fontWeight: 700 }}
+              />
+            </Box>
+          </Box>
+
           <ConnectionMetricsCard metrics={connectionMetrics} />
 
           <Grid container spacing={3}>
