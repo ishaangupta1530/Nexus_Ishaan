@@ -431,6 +431,10 @@ export class FastChatGateway
     messageContent: string,
     messageId: string,
   ): Promise<void> {
+    void senderUserId;
+    void messageContent;
+    void messageId;
+
     this.logger.log(
       `📱 Recipient ${receiverUserId} is offline, sending push notification`,
     );
@@ -441,7 +445,7 @@ export class FastChatGateway
     });
 
     this.logger.log(
-      `ℹ️ FCM feature disabled - push notification skipped for user ${receiverUserId}`,
+      `ℹ️ FCM feature disabled - push notification skipped for user ${recipient?.name || receiverUserId}`,
     );
   }
 

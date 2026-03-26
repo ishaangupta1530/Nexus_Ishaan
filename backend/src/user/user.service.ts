@@ -260,6 +260,8 @@ export class UserService {
    * @returns A promise that resolves to the updated user object.
    */
   async registerFcmToken(userId: string, deviceToken: string) {
+    void deviceToken;
+
     this.logger.debug(
       `FCM token registration requested for user ${userId} (feature disabled)`,
     );

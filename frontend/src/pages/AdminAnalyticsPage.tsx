@@ -6,6 +6,7 @@ import {
   CircularProgress,
   Container,
   Grid,
+  Paper,
   useMediaQuery,
   MenuItem,
   Stack,
@@ -41,6 +42,12 @@ import referralMentorshipAnalyticsService, {
   type ReferralConversionResponse,
   type ReferralFunnelResponse,
 } from '@/services/referralMentorshipAnalyticsService';
+import adminAnalyticsService, {
+  type PlatformStatsResponse,
+  type UserGrowthResponse,
+  type ContentStatsResponse,
+  type ModerationQueueResponse,
+} from '@/services/adminAnalyticsService';
 import ConnectionGrowthChart from '@/components/Analytics/Connections/ConnectionGrowthChart';
 import ConnectionDistributionChart from '@/components/Analytics/Connections/ConnectionDistributionChart';
 import NetworkStrengthGauge from '@/components/Analytics/Connections/NetworkStrengthGauge';
@@ -73,19 +80,22 @@ type AdminUserOption = {
   role: string;
 };
 
-type TabType = 'connections' | 'engagement' | 'referrals';
+type TabType = 'connections' | 'engagement' | 'referrals' | 'platform';
 type ThemePreference = 'light' | 'dark' | 'auto';
 type ConnectionChartType = 'area' | 'line';
 type ReferralChartType = 'line' | 'bar';
 
 const AUTO_REFRESH_OPTIONS = [
-  { label: 'Off',     value: 0   },
-  { label: '30 sec',  value: 30  },
-  { label: '1 min',   value: 60  },
-  { label: '5 min',   value: 300 },
+  { label: 'Off', value: 0 },
+  { label: '30 sec', value: 30 },
+  { label: '1 min', value: 60 },
+  { label: '5 min', value: 300 },
 ] as const;
 
-const METRIC_OPTIONS_BY_TAB: Record<TabType, Array<{ key: string; label: string }>> = {
+const METRIC_OPTIONS_BY_TAB: Record<
+  TabType,
+  Array<{ key: string; label: string }>
+> = {
   connections: [
     { key: 'connections.summary', label: 'Animated Summary' },
     { key: 'connections.metrics', label: 'Metrics Card' },
@@ -105,6 +115,12 @@ const METRIC_OPTIONS_BY_TAB: Record<TabType, Array<{ key: string; label: string 
     { key: 'referrals.success', label: 'Success Rate Chart' },
     { key: 'referrals.mentorship', label: 'Mentorship Dashboard' },
   ],
+  platform: [
+    { key: 'platform.overview', label: 'Platform Overview' },
+    { key: 'platform.activity', label: 'User Activity' },
+    { key: 'platform.content', label: 'Content Statistics' },
+    { key: 'platform.moderation', label: 'Moderation Queue' },
+  ],
 };
 
 const DEFAULT_METRIC_VISIBILITY = Object.values(METRIC_OPTIONS_BY_TAB)
@@ -118,18 +134,29 @@ const MOBILE_PRIORITIZED_METRICS: Record<TabType, string[]> = {
   connections: ['connections.metrics', 'connections.growth'],
   engagement: ['engagement.summary', 'engagement.timeline'],
   referrals: ['referrals.metrics', 'referrals.success'],
+  platform: ['platform.overview', 'platform.moderation'],
+};
+
+const resolveDaysFromTimePeriod = (period: TimePeriodValue): number => {
+  if (period === '7d') return 7;
+  if (period === '30d') return 30;
+  if (period === '90d') return 90;
+  return 365;
 };
 
 const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 
 const resolveApiPeriodFromCustomRange = (
   startDate: string,
-  endDate: string,
+  endDate: string
 ): ConnectionAnalyticsPeriod => {
   if (!startDate || !endDate) return '30d';
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const diffDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
+  const diffDays = Math.max(
+    1,
+    Math.ceil((end.getTime() - start.getTime()) / 86_400_000)
+  );
 
   if (diffDays <= 7) return '7d';
   if (diffDays <= 30) return '30d';
@@ -137,7 +164,11 @@ const resolveApiPeriodFromCustomRange = (
   return '1y';
 };
 
-const inDateRange = (dateString: string, startDate: string, endDate: string): boolean => {
+const inDateRange = (
+  dateString: string,
+  startDate: string,
+  endDate: string
+): boolean => {
   if (!startDate || !endDate) return true;
   const d = new Date(dateString);
   const s = new Date(startDate);
@@ -145,7 +176,10 @@ const inDateRange = (dateString: string, startDate: string, endDate: string): bo
   return d >= s && d <= e;
 };
 
-const buildDashboardShareUrl = (baseUrl: string, params: Record<string, string>) => {
+const buildDashboardShareUrl = (
+  baseUrl: string,
+  params: Record<string, string>
+) => {
   const url = new URL(baseUrl);
   Object.entries(params).forEach(([key, value]) => {
     if (value) {
@@ -162,67 +196,91 @@ const AdminAnalyticsPage: FC = () => {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>(
-    (searchParams.get('tab') as TabType) || 'connections',
+    (searchParams.get('tab') as TabType) || 'connections'
   );
-  
+
   // Filter and customization state
   const [timePeriod, setTimePeriod] = useState<TimePeriodValue>(
-    (searchParams.get('period') as TimePeriodValue) || '30d',
+    (searchParams.get('period') as TimePeriodValue) || '30d'
   );
   const [customStartDate, setCustomStartDate] = useState(
-    searchParams.get('start') || toIsoDate(new Date(Date.now() - 29 * 86_400_000)),
+    searchParams.get('start') ||
+      toIsoDate(new Date(Date.now() - 29 * 86_400_000))
   );
   const [customEndDate, setCustomEndDate] = useState(
-    searchParams.get('end') || toIsoDate(new Date()),
+    searchParams.get('end') || toIsoDate(new Date())
   );
-  const [metricVisibility, setMetricVisibility] = useState<Record<string, boolean>>(
-    () => {
-      const metricsParam = searchParams.get('metrics');
-      if (!metricsParam) return DEFAULT_METRIC_VISIBILITY;
+  const [metricVisibility, setMetricVisibility] = useState<
+    Record<string, boolean>
+  >(() => {
+    const metricsParam = searchParams.get('metrics');
+    if (!metricsParam) return DEFAULT_METRIC_VISIBILITY;
 
-      const enabled = new Set(metricsParam.split(',').filter(Boolean));
-      return Object.keys(DEFAULT_METRIC_VISIBILITY).reduce<Record<string, boolean>>(
-        (acc, key) => {
-          acc[key] = enabled.has(key);
-          return acc;
-        },
-        {},
-      );
-    },
-  );
+    const enabled = new Set(metricsParam.split(',').filter(Boolean));
+    return Object.keys(DEFAULT_METRIC_VISIBILITY).reduce<
+      Record<string, boolean>
+    >((acc, key) => {
+      acc[key] = enabled.has(key);
+      return acc;
+    }, {});
+  });
   const [themePreference, setThemePreference] = useState<ThemePreference>(
-    (searchParams.get('theme') as ThemePreference) || 'auto',
+    (searchParams.get('theme') as ThemePreference) || 'auto'
   );
-  const [connectionChartType, setConnectionChartType] = useState<ConnectionChartType>(
-    (searchParams.get('connChart') as ConnectionChartType) || 'area',
-  );
+  const [connectionChartType, setConnectionChartType] =
+    useState<ConnectionChartType>(
+      (searchParams.get('connChart') as ConnectionChartType) || 'area'
+    );
   const [referralChartType, setReferralChartType] = useState<ReferralChartType>(
-    (searchParams.get('refChart') as ReferralChartType) || 'line',
+    (searchParams.get('refChart') as ReferralChartType) || 'line'
   );
 
   // Connection analytics state
-  const [targetUserId, setTargetUserId] = useState(searchParams.get('userId') || '');
+  const [targetUserId, setTargetUserId] = useState(
+    searchParams.get('userId') || ''
+  );
   const [growth, setGrowth] = useState<ConnectionGrowthResponse | null>(null);
-  const [distribution, setDistribution] = useState<ConnectionDistributionResponse | null>(null);
-  const [strength, setStrength] = useState<ConnectionStrengthResponse | null>(null);
-  
+  const [distribution, setDistribution] =
+    useState<ConnectionDistributionResponse | null>(null);
+  const [strength, setStrength] = useState<ConnectionStrengthResponse | null>(
+    null
+  );
+
   // Engagement analytics state
-  const [engagementSummary, setEngagementSummary] = useState<EngagementSummaryResponse | null>(null);
+  const [engagementSummary, setEngagementSummary] =
+    useState<EngagementSummaryResponse | null>(null);
   const [heatmap, setHeatmap] = useState<ActivityHeatmapResponse | null>(null);
   const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
-  const [contentPerformance, setContentPerformance] = useState<ContentPerformanceResponse | null>(null);
+  const [contentPerformance, setContentPerformance] =
+    useState<ContentPerformanceResponse | null>(null);
   const [contentPerfPage, setContentPerfPage] = useState(1);
 
   // Referral and mentorship analytics state
-  const [referralConversion, setReferralConversion] = useState<ReferralConversionResponse | null>(null);
-  const [referralFunnel, setReferralFunnel] = useState<ReferralFunnelResponse | null>(null);
-  const [mentorshipSummary, setMentorshipSummary] = useState<MentorshipSummaryResponse | null>(null);
-  const [mentorshipImpact, setMentorshipImpact] = useState<MentorshipImpactResponse | null>(null);
-  const [selectedIndustry, setSelectedIndustry] = useState(searchParams.get('industry') || 'ALL');
-  
+  const [referralConversion, setReferralConversion] =
+    useState<ReferralConversionResponse | null>(null);
+  const [referralFunnel, setReferralFunnel] =
+    useState<ReferralFunnelResponse | null>(null);
+  const [mentorshipSummary, setMentorshipSummary] =
+    useState<MentorshipSummaryResponse | null>(null);
+  const [mentorshipImpact, setMentorshipImpact] =
+    useState<MentorshipImpactResponse | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = useState(
+    searchParams.get('industry') || 'ALL'
+  );
+
+  // Platform analytics state
+  const [platformStats, setPlatformStats] =
+    useState<PlatformStatsResponse | null>(null);
+  const [userGrowth, setUserGrowth] = useState<UserGrowthResponse | null>(null);
+  const [contentStats, setContentStats] = useState<ContentStatsResponse | null>(
+    null
+  );
+  const [moderationQueue, setModerationQueue] =
+    useState<ModerationQueueResponse | null>(null);
+
   // General state
   const [userOptions, setUserOptions] = useState<AdminUserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -233,9 +291,11 @@ const AdminAnalyticsPage: FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(
-    Number(searchParams.get('auto') || '0'),
+    Number(searchParams.get('auto') || '0')
   );
-  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
   const chartExportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -256,7 +316,7 @@ const AdminAnalyticsPage: FC = () => {
         const raw = response.data as unknown;
         const users = Array.isArray(raw)
           ? (raw as AdminUserOption[])
-          : ((raw as { users?: AdminUserOption[] })?.users || []);
+          : (raw as { users?: AdminUserOption[] })?.users || [];
         setUserOptions(users);
       } catch (err) {
         console.error('Failed to load users for analytics selector', err);
@@ -274,7 +334,7 @@ const AdminAnalyticsPage: FC = () => {
         ...option,
         enabled: metricVisibility[option.key] ?? true,
       })),
-    [activeTab, metricVisibility],
+    [activeTab, metricVisibility]
   );
 
   const toggleMetricVisibility = useCallback((key: string) => {
@@ -288,7 +348,7 @@ const AdminAnalyticsPage: FC = () => {
       if (!isMobile) return true;
       return MOBILE_PRIORITIZED_METRICS[activeTab].includes(key);
     },
-    [activeTab, isMobile, metricVisibility],
+    [activeTab, isMobile, metricVisibility]
   );
 
   const resolvedApiPeriod = useMemo<ConnectionAnalyticsPeriod>(() => {
@@ -298,6 +358,19 @@ const AdminAnalyticsPage: FC = () => {
 
     return resolveApiPeriodFromCustomRange(customStartDate, customEndDate);
   }, [timePeriod, customStartDate, customEndDate]);
+
+  const adminAnalyticsParams = useMemo(
+    () =>
+      timePeriod === 'custom'
+        ? {
+            startDate: customStartDate,
+            endDate: customEndDate,
+          }
+        : {
+            days: resolveDaysFromTimePeriod(timePeriod),
+          },
+    [timePeriod, customStartDate, customEndDate]
+  );
 
   useEffect(() => {
     if (!user?.id) return;
@@ -318,14 +391,28 @@ const AdminAnalyticsPage: FC = () => {
         themePreference?: ThemePreference;
       };
 
-      if (!searchParams.get('period') && parsed.timePeriod) setTimePeriod(parsed.timePeriod);
-      if (!searchParams.get('start') && parsed.customStartDate) setCustomStartDate(parsed.customStartDate);
-      if (!searchParams.get('end') && parsed.customEndDate) setCustomEndDate(parsed.customEndDate);
-      if (parsed.metricVisibility) setMetricVisibility((prev) => ({ ...prev, ...parsed.metricVisibility }));
-      if (!searchParams.get('auto') && typeof parsed.autoRefreshInterval === 'number') setAutoRefreshInterval(parsed.autoRefreshInterval);
-      if (!searchParams.get('connChart') && parsed.connectionChartType) setConnectionChartType(parsed.connectionChartType);
-      if (!searchParams.get('refChart') && parsed.referralChartType) setReferralChartType(parsed.referralChartType);
-      if (!searchParams.get('theme') && parsed.themePreference) setThemePreference(parsed.themePreference);
+      if (!searchParams.get('period') && parsed.timePeriod)
+        setTimePeriod(parsed.timePeriod);
+      if (!searchParams.get('start') && parsed.customStartDate)
+        setCustomStartDate(parsed.customStartDate);
+      if (!searchParams.get('end') && parsed.customEndDate)
+        setCustomEndDate(parsed.customEndDate);
+      if (parsed.metricVisibility)
+        setMetricVisibility((prev) => ({
+          ...prev,
+          ...parsed.metricVisibility,
+        }));
+      if (
+        !searchParams.get('auto') &&
+        typeof parsed.autoRefreshInterval === 'number'
+      )
+        setAutoRefreshInterval(parsed.autoRefreshInterval);
+      if (!searchParams.get('connChart') && parsed.connectionChartType)
+        setConnectionChartType(parsed.connectionChartType);
+      if (!searchParams.get('refChart') && parsed.referralChartType)
+        setReferralChartType(parsed.referralChartType);
+      if (!searchParams.get('theme') && parsed.themePreference)
+        setThemePreference(parsed.themePreference);
     } catch (err) {
       console.error('Failed to parse analytics filter preferences', err);
     }
@@ -346,7 +433,7 @@ const AdminAnalyticsPage: FC = () => {
         connectionChartType,
         referralChartType,
         themePreference,
-      }),
+      })
     );
   }, [
     user?.id,
@@ -380,7 +467,7 @@ const AdminAnalyticsPage: FC = () => {
         industry: selectedIndustry,
         metrics: enabledMetricKeys,
       },
-      { replace: true },
+      { replace: true }
     );
   }, [
     setSearchParams,
@@ -461,7 +548,10 @@ const AdminAnalyticsPage: FC = () => {
       }
 
       window.prompt('Copy this dashboard link:', url);
-      toast('Clipboard access was blocked. Copy the link from the prompt.', 'warning');
+      toast(
+        'Clipboard access was blocked. Copy the link from the prompt.',
+        'warning'
+      );
     }
   }, [
     activeTab,
@@ -479,127 +569,185 @@ const AdminAnalyticsPage: FC = () => {
   ]);
 
   // Load connection analytics
-  const loadConnectionAnalytics = useCallback(async (silent = false) => {
-    if (!targetUserId) {
-      setError('Target user ID is required to fetch analytics.');
-      return;
-    }
+  const loadConnectionAnalytics = useCallback(
+    async (silent = false) => {
+      if (!targetUserId) {
+        setError('Target user ID is required to fetch analytics.');
+        return;
+      }
 
-    if (!silent) setLoading(true);
-    setError(null);
+      if (!silent) setLoading(true);
+      setError(null);
 
-    try {
-      const [growthRes, distributionRes, strengthRes] = await Promise.all([
-        connectionAnalyticsService.getGrowth(targetUserId, resolvedApiPeriod),
-        connectionAnalyticsService.getDistribution(targetUserId),
-        connectionAnalyticsService.getStrengthScore(targetUserId),
-      ]);
+      try {
+        const [growthRes, distributionRes, strengthRes] = await Promise.all([
+          connectionAnalyticsService.getGrowth(targetUserId, resolvedApiPeriod),
+          connectionAnalyticsService.getDistribution(targetUserId),
+          connectionAnalyticsService.getStrengthScore(targetUserId),
+        ]);
 
-      setGrowth(growthRes.data);
-      setDistribution(distributionRes.data);
-      setStrength(strengthRes.data);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Failed to load connection analytics', err);
-      setError('Failed to load analytics. Ensure your admin token is valid and try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [resolvedApiPeriod, targetUserId]);
+        setGrowth(growthRes.data);
+        setDistribution(distributionRes.data);
+        setStrength(strengthRes.data);
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load connection analytics', err);
+        setError(
+          'Failed to load analytics. Ensure your admin token is valid and try again.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [resolvedApiPeriod, targetUserId]
+  );
 
   // Load engagement analytics
-  const loadEngagementAnalytics = useCallback(async (silent = false) => {
-    if (!targetUserId) {
-      setError('Target user ID is required to fetch analytics.');
-      return;
-    }
-
-    if (!silent) setLoading(true);
-    setError(null);
-
-    try {
-      const [summaryRes, heatmapRes, perfRes] = await Promise.allSettled([
-        engagementAnalyticsService.getSummary(
-          targetUserId,
-          resolvedApiPeriod as EngagementAnalyticsPeriod,
-        ),
-        engagementAnalyticsService.getHeatmap(targetUserId, heatmapYear),
-        engagementAnalyticsService.getContentPerformance(targetUserId, contentPerfPage, 10),
-      ]);
-
-      if (summaryRes.status === 'fulfilled') {
-        setEngagementSummary(summaryRes.value.data);
-      }
-      if (heatmapRes.status === 'fulfilled') {
-        setHeatmap(heatmapRes.value.data);
-      }
-      if (perfRes.status === 'fulfilled') {
-        setContentPerformance(perfRes.value.data);
+  const loadEngagementAnalytics = useCallback(
+    async (silent = false) => {
+      if (!targetUserId) {
+        setError('Target user ID is required to fetch analytics.');
+        return;
       }
 
-      if (
-        summaryRes.status === 'rejected' &&
-        heatmapRes.status === 'rejected' &&
-        perfRes.status === 'rejected'
-      ) {
-        throw new Error('All engagement analytics requests failed');
+      if (!silent) setLoading(true);
+      setError(null);
+
+      try {
+        const [summaryRes, heatmapRes, perfRes] = await Promise.allSettled([
+          engagementAnalyticsService.getSummary(
+            targetUserId,
+            resolvedApiPeriod as EngagementAnalyticsPeriod
+          ),
+          engagementAnalyticsService.getHeatmap(targetUserId, heatmapYear),
+          engagementAnalyticsService.getContentPerformance(
+            targetUserId,
+            contentPerfPage,
+            10
+          ),
+        ]);
+
+        if (summaryRes.status === 'fulfilled') {
+          setEngagementSummary(summaryRes.value.data);
+        }
+        if (heatmapRes.status === 'fulfilled') {
+          setHeatmap(heatmapRes.value.data);
+        }
+        if (perfRes.status === 'fulfilled') {
+          setContentPerformance(perfRes.value.data);
+        }
+
+        if (
+          summaryRes.status === 'rejected' &&
+          heatmapRes.status === 'rejected' &&
+          perfRes.status === 'rejected'
+        ) {
+          throw new Error('All engagement analytics requests failed');
+        }
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load engagement analytics', err);
+        setError(
+          'Failed to load engagement analytics. Ensure your admin token is valid and try again.'
+        );
+      } finally {
+        setLoading(false);
       }
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Failed to load engagement analytics', err);
-      setError('Failed to load engagement analytics. Ensure your admin token is valid and try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUserId, resolvedApiPeriod, heatmapYear, contentPerfPage]);
+    },
+    [targetUserId, resolvedApiPeriod, heatmapYear, contentPerfPage]
+  );
 
-  const loadReferralMentorshipAnalytics = useCallback(async (silent = false) => {
-    if (!targetUserId) {
-      setError('Target user ID is required to fetch analytics.');
-      return;
-    }
+  const loadReferralMentorshipAnalytics = useCallback(
+    async (silent = false) => {
+      if (!targetUserId) {
+        setError('Target user ID is required to fetch analytics.');
+        return;
+      }
 
-    if (!silent) setLoading(true);
-    setError(null);
+      if (!silent) setLoading(true);
+      setError(null);
 
-    try {
-      const [conversionRes, funnelRes, mentorshipSummaryRes, mentorshipImpactRes] =
-        await Promise.allSettled([
-          referralMentorshipAnalyticsService.getReferralConversion(targetUserId),
+      try {
+        const [
+          conversionRes,
+          funnelRes,
+          mentorshipSummaryRes,
+          mentorshipImpactRes,
+        ] = await Promise.allSettled([
+          referralMentorshipAnalyticsService.getReferralConversion(
+            targetUserId
+          ),
           referralMentorshipAnalyticsService.getReferralFunnel(targetUserId),
           referralMentorshipAnalyticsService.getMentorshipSummary(targetUserId),
           referralMentorshipAnalyticsService.getMentorshipImpact(targetUserId),
         ]);
 
-      if (conversionRes.status === 'fulfilled') {
-        setReferralConversion(conversionRes.value.data);
-      }
-      if (funnelRes.status === 'fulfilled') {
-        setReferralFunnel(funnelRes.value.data);
-      }
-      if (mentorshipSummaryRes.status === 'fulfilled') {
-        setMentorshipSummary(mentorshipSummaryRes.value.data);
-      }
-      if (mentorshipImpactRes.status === 'fulfilled') {
-        setMentorshipImpact(mentorshipImpactRes.value.data);
-      }
+        if (conversionRes.status === 'fulfilled') {
+          setReferralConversion(conversionRes.value.data);
+        }
+        if (funnelRes.status === 'fulfilled') {
+          setReferralFunnel(funnelRes.value.data);
+        }
+        if (mentorshipSummaryRes.status === 'fulfilled') {
+          setMentorshipSummary(mentorshipSummaryRes.value.data);
+        }
+        if (mentorshipImpactRes.status === 'fulfilled') {
+          setMentorshipImpact(mentorshipImpactRes.value.data);
+        }
 
-      if (
-        conversionRes.status === 'rejected' &&
-        funnelRes.status === 'rejected' &&
-        mentorshipSummaryRes.status === 'rejected' &&
-        mentorshipImpactRes.status === 'rejected'
-      ) {
-        throw new Error('All referral and mentorship analytics requests failed');
+        if (
+          conversionRes.status === 'rejected' &&
+          funnelRes.status === 'rejected' &&
+          mentorshipSummaryRes.status === 'rejected' &&
+          mentorshipImpactRes.status === 'rejected'
+        ) {
+          throw new Error(
+            'All referral and mentorship analytics requests failed'
+          );
+        }
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load referral and mentorship analytics', err);
+        setError(
+          'Failed to load referral and mentorship analytics. Ensure your admin token is valid and try again.'
+        );
+      } finally {
+        setLoading(false);
       }
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Failed to load referral and mentorship analytics', err);
-      setError('Failed to load referral and mentorship analytics. Ensure your admin token is valid and try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUserId]);
+    },
+    [targetUserId]
+  );
+
+  const loadPlatformAnalytics = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+
+      try {
+        const [platformRes, growthRes, contentRes, moderationRes] =
+          await Promise.all([
+            adminAnalyticsService.getPlatformStats(adminAnalyticsParams),
+            adminAnalyticsService.getUserGrowth(adminAnalyticsParams),
+            adminAnalyticsService.getContentStats(adminAnalyticsParams),
+            adminAnalyticsService.getModerationQueue(adminAnalyticsParams),
+          ]);
+
+        setPlatformStats(platformRes.data);
+        setUserGrowth(growthRes.data);
+        setContentStats(contentRes.data);
+        setModerationQueue(moderationRes.data);
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load platform analytics', err);
+        setError(
+          'Failed to load platform analytics. Ensure your admin token is valid and try again.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [adminAnalyticsParams]
+  );
 
   useEffect(() => {
     if (targetUserId && activeTab === 'connections') {
@@ -619,13 +767,28 @@ const AdminAnalyticsPage: FC = () => {
     }
   }, [targetUserId, activeTab, loadReferralMentorshipAnalytics]);
 
+  useEffect(() => {
+    if (activeTab === 'platform') {
+      void loadPlatformAnalytics();
+    }
+  }, [activeTab, loadPlatformAnalytics]);
+
   // Silent (non-blocking) refresh for auto-refresh and WS-triggered updates
   const silentRefreshCurrentTab = useCallback(async () => {
-    if (!targetUserId) return;
+    if (activeTab !== 'platform' && !targetUserId) return;
     if (activeTab === 'connections') await loadConnectionAnalytics(true);
     else if (activeTab === 'engagement') await loadEngagementAnalytics(true);
-    else await loadReferralMentorshipAnalytics(true);
-  }, [activeTab, targetUserId, loadConnectionAnalytics, loadEngagementAnalytics, loadReferralMentorshipAnalytics]);
+    else if (activeTab === 'referrals')
+      await loadReferralMentorshipAnalytics(true);
+    else await loadPlatformAnalytics(true);
+  }, [
+    activeTab,
+    targetUserId,
+    loadConnectionAnalytics,
+    loadEngagementAnalytics,
+    loadReferralMentorshipAnalytics,
+    loadPlatformAnalytics,
+  ]);
 
   // Manual refresh handler — shows button spinner, NOT the page overlay
   const handleManualRefresh = useCallback(async () => {
@@ -643,7 +806,8 @@ const AdminAnalyticsPage: FC = () => {
       }, autoRefreshInterval * 1_000);
     }
     return () => {
-      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+      if (autoRefreshTimerRef.current)
+        clearInterval(autoRefreshTimerRef.current);
     };
   }, [autoRefreshInterval, silentRefreshCurrentTab]);
 
@@ -656,17 +820,26 @@ const AdminAnalyticsPage: FC = () => {
       { label: 'Total Connections', value: growth.metrics.totalConnections },
       { label: 'Growth Rate', value: `${growth.metrics.growthRate}%` },
       { label: 'Velocity', value: `${growth.metrics.velocity}/bucket` },
-      { label: 'Avg Response Time', value: `${strength.metrics.averageResponseTimeHours}h` },
-      { label: 'Network Density', value: `${strength.metrics.networkDensity.toFixed(2)}%` },
+      {
+        label: 'Avg Response Time',
+        value: `${strength.metrics.averageResponseTimeHours}h`,
+      },
+      {
+        label: 'Network Density',
+        value: `${strength.metrics.networkDensity.toFixed(2)}%`,
+      },
       { label: 'Top Role', value: distribution.byRole[0]?.role || 'N/A' },
       { label: 'Strength Score', value: strength.score },
-      { label: 'Period', value: timePeriod === 'custom' ? 'CUSTOM' : timePeriod.toUpperCase() },
+      {
+        label: 'Period',
+        value: timePeriod === 'custom' ? 'CUSTOM' : timePeriod.toUpperCase(),
+      },
     ];
   }, [distribution, growth, strength, timePeriod]);
 
   const selectedUserExists = useMemo(
     () => userOptions.some((option) => option.id === targetUserId),
-    [targetUserId, userOptions],
+    [targetUserId, userOptions]
   );
 
   const engagementData = useMemo<EngagementSummaryData | null>(() => {
@@ -685,7 +858,7 @@ const AdminAnalyticsPage: FC = () => {
     if (!growth || timePeriod !== 'custom') return growth;
 
     const points = growth.data.filter((item) =>
-      inDateRange(item.bucketStart, customStartDate, customEndDate),
+      inDateRange(item.bucketStart, customStartDate, customEndDate)
     );
 
     if (points.length === 0) {
@@ -706,7 +879,10 @@ const AdminAnalyticsPage: FC = () => {
       metrics: {
         ...growth.metrics,
         totalConnections: points[points.length - 1]?.totalConnections || 0,
-        newConnections: points.reduce((sum, item) => sum + item.newConnections, 0),
+        newConnections: points.reduce(
+          (sum, item) => sum + item.newConnections,
+          0
+        ),
       },
     };
   }, [growth, timePeriod, customStartDate, customEndDate]);
@@ -715,7 +891,7 @@ const AdminAnalyticsPage: FC = () => {
     if (!engagementData || timePeriod !== 'custom') return engagementData;
 
     const timeline = engagementData.timeline.filter((item) =>
-      inDateRange(item.bucketStart, customStartDate, customEndDate),
+      inDateRange(item.bucketStart, customStartDate, customEndDate)
     );
 
     return {
@@ -728,7 +904,7 @@ const AdminAnalyticsPage: FC = () => {
     if (!heatmap || timePeriod !== 'custom') return heatmap;
 
     const days = heatmap.days.filter((day) =>
-      inDateRange(day.date, customStartDate, customEndDate),
+      inDateRange(day.date, customStartDate, customEndDate)
     );
 
     return {
@@ -740,31 +916,58 @@ const AdminAnalyticsPage: FC = () => {
     };
   }, [heatmap, timePeriod, customStartDate, customEndDate]);
 
+  const latestNewUsers = useMemo(
+    () => userGrowth?.trend.slice(-7).reverse() || [],
+    [userGrowth]
+  );
+
+  const latestContentTrend = useMemo(
+    () => contentStats?.trend.slice(-7).reverse() || [],
+    [contentStats]
+  );
+
+  const latestModerationTrend = useMemo(
+    () =>
+      moderationQueue?.trends.reportsCreatedPerDay.slice(-7).reverse() || [],
+    [moderationQueue]
+  );
+
   return (
     <Container
       maxWidth="xl"
       sx={{
         py: 4,
-        '& .MuiButtonBase-root:focus-visible, & .MuiInputBase-input:focus-visible': {
-          outline: '2px solid',
-          outlineColor: 'primary.main',
-          outlineOffset: 2,
-        },
+        '& .MuiButtonBase-root:focus-visible, & .MuiInputBase-input:focus-visible':
+          {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: 2,
+          },
       }}
     >
       {/* ── Page header ─────────────────────────────── */}
       <Stack spacing={1} sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1,
+          }}
+        >
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 800 }}>
               Admin Analytics Dashboard
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Comprehensive analytics for connections, engagement, and performance metrics.
+              Comprehensive analytics for connections, engagement, and
+              performance metrics.
             </Typography>
             {isMobile ? (
               <Typography variant="caption" color="text.secondary">
-                Mobile view shows prioritized charts for readability. Rotate device or use desktop for full detail.
+                Mobile view shows prioritized charts for readability. Rotate
+                device or use desktop for full detail.
               </Typography>
             ) : null}
           </Box>
@@ -783,11 +986,17 @@ const AdminAnalyticsPage: FC = () => {
               <RealtimeIndicator
                 userId={user.id}
                 token={token}
-                onAnalyticsUpdate={() => { void silentRefreshCurrentTab(); }}
+                onAnalyticsUpdate={() => {
+                  void silentRefreshCurrentTab();
+                }}
               />
             ) : null}
 
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+            <Divider
+              orientation="vertical"
+              flexItem
+              sx={{ display: { xs: 'none', sm: 'block' } }}
+            />
 
             <TextField
               select
@@ -806,7 +1015,9 @@ const AdminAnalyticsPage: FC = () => {
             </TextField>
 
             <RefreshButton
-              onRefresh={() => { void handleManualRefresh(); }}
+              onRefresh={() => {
+                void handleManualRefresh();
+              }}
               isLoading={isRefreshing}
               disabled={!targetUserId}
             />
@@ -827,6 +1038,7 @@ const AdminAnalyticsPage: FC = () => {
           <Tab label="Connection Analytics" value="connections" />
           <Tab label="Engagement Analytics" value="engagement" />
           <Tab label="Referrals & Mentorship" value="referrals" />
+          <Tab label="Platform Insights" value="platform" />
         </Tabs>
       </Box>
 
@@ -869,7 +1081,9 @@ const AdminAnalyticsPage: FC = () => {
               label="Color Scheme"
               inputProps={{ 'aria-label': 'Select color scheme' }}
               value={themePreference}
-              onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
+              onChange={(event) =>
+                setThemePreference(event.target.value as ThemePreference)
+              }
               sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="light">Light</MenuItem>
@@ -888,8 +1102,18 @@ const AdminAnalyticsPage: FC = () => {
           />
         ) : null}
 
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          <MetricToggle options={activeMetricOptions} onToggle={toggleMetricVisibility} />
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          <MetricToggle
+            options={activeMetricOptions}
+            onToggle={toggleMetricVisibility}
+          />
 
           {activeTab === 'connections' ? (
             <TextField
@@ -898,7 +1122,11 @@ const AdminAnalyticsPage: FC = () => {
               label="Connection Chart"
               inputProps={{ 'aria-label': 'Select connection chart type' }}
               value={connectionChartType}
-              onChange={(event) => setConnectionChartType(event.target.value as ConnectionChartType)}
+              onChange={(event) =>
+                setConnectionChartType(
+                  event.target.value as ConnectionChartType
+                )
+              }
               sx={{ minWidth: 180, '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="area">Area</MenuItem>
@@ -913,7 +1141,9 @@ const AdminAnalyticsPage: FC = () => {
               label="Referral Chart"
               inputProps={{ 'aria-label': 'Select referral chart type' }}
               value={referralChartType}
-              onChange={(event) => setReferralChartType(event.target.value as ReferralChartType)}
+              onChange={(event) =>
+                setReferralChartType(event.target.value as ReferralChartType)
+              }
               sx={{ minWidth: 180, '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="line">Line</MenuItem>
@@ -930,7 +1160,9 @@ const AdminAnalyticsPage: FC = () => {
             variant="outlined"
             size="small"
             startIcon={<ShareIcon fontSize="small" />}
-            onClick={() => { void handleShareLink(); }}
+            onClick={() => {
+              void handleShareLink();
+            }}
             aria-label="Share analytics dashboard link"
             sx={{ minHeight: 44 }}
           >
@@ -939,7 +1171,11 @@ const AdminAnalyticsPage: FC = () => {
         </Box>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -948,13 +1184,21 @@ const AdminAnalyticsPage: FC = () => {
       ) : null}
 
       {/* Connection Analytics Tab */}
-      {!loading && activeTab === 'connections' && filteredGrowth && distribution && strength ? (
+      {!loading &&
+      activeTab === 'connections' &&
+      filteredGrowth &&
+      distribution &&
+      strength ? (
         <Stack spacing={3} ref={chartExportRef}>
           {/* Animated summary row */}
           {isMetricEnabled('connections.summary') ? (
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', pb: 0.5 }}>
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}
+                >
                   Total Connections
                 </Typography>
                 <UpdateAnimation
@@ -964,7 +1208,11 @@ const AdminAnalyticsPage: FC = () => {
                 />
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}
+                >
                   Growth Rate
                 </Typography>
                 <UpdateAnimation
@@ -976,11 +1224,19 @@ const AdminAnalyticsPage: FC = () => {
                 />
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}
+                >
                   Strength Score
                 </Typography>
                 <UpdateAnimation
-                  value={typeof strength.score === 'number' ? strength.score : Number.parseFloat(String(strength.score))}
+                  value={
+                    typeof strength.score === 'number'
+                      ? strength.score
+                      : Number.parseFloat(String(strength.score))
+                  }
                   decimals={1}
                   variant="h5"
                   sx={{ fontWeight: 700 }}
@@ -995,13 +1251,24 @@ const AdminAnalyticsPage: FC = () => {
 
           <Grid container spacing={3}>
             {isMetricEnabled('connections.growth') ? (
-              <Grid item xs={12} lg={isMetricEnabled('connections.strength') ? 8 : 12}>
-                <ConnectionGrowthChart growth={filteredGrowth} chartType={connectionChartType} />
+              <Grid
+                item
+                xs={12}
+                lg={isMetricEnabled('connections.strength') ? 8 : 12}
+              >
+                <ConnectionGrowthChart
+                  growth={filteredGrowth}
+                  chartType={connectionChartType}
+                />
               </Grid>
             ) : null}
 
             {isMetricEnabled('connections.strength') ? (
-              <Grid item xs={12} lg={isMetricEnabled('connections.growth') ? 4 : 12}>
+              <Grid
+                item
+                xs={12}
+                lg={isMetricEnabled('connections.growth') ? 4 : 12}
+              >
                 <NetworkStrengthGauge strength={strength} />
               </Grid>
             ) : null}
@@ -1015,7 +1282,10 @@ const AdminAnalyticsPage: FC = () => {
 
       {/* Engagement Analytics Tab */}
       {activeTab === 'engagement' ? (
-        !loading && filteredEngagementData && filteredHeatmap && contentPerformance ? (
+        !loading &&
+        filteredEngagementData &&
+        filteredHeatmap &&
+        contentPerformance ? (
           <Stack spacing={3} ref={chartExportRef}>
             {isMetricEnabled('engagement.summary') ? (
               <EngagementMetricsCard data={filteredEngagementData} />
@@ -1050,13 +1320,19 @@ const AdminAnalyticsPage: FC = () => {
           </Box>
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <Typography color="text.secondary">Loading engagement analytics...</Typography>
+            <Typography color="text.secondary">
+              Loading engagement analytics...
+            </Typography>
           </Box>
         )
       ) : null}
 
       {activeTab === 'referrals' ? (
-        !loading && referralConversion && referralFunnel && mentorshipSummary && mentorshipImpact ? (
+        !loading &&
+        referralConversion &&
+        referralFunnel &&
+        mentorshipSummary &&
+        mentorshipImpact ? (
           <Stack spacing={3} ref={chartExportRef}>
             {isMetricEnabled('referrals.metrics') ? (
               <ReferralMetricsCard conversion={referralConversion} />
@@ -1088,7 +1364,321 @@ const AdminAnalyticsPage: FC = () => {
           </Box>
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <Typography color="text.secondary">Loading referral and mentorship analytics...</Typography>
+            <Typography color="text.secondary">
+              Loading referral and mentorship analytics...
+            </Typography>
+          </Box>
+        )
+      ) : null}
+
+      {activeTab === 'platform' ? (
+        !loading &&
+        platformStats &&
+        userGrowth &&
+        contentStats &&
+        moderationQueue ? (
+          <Stack spacing={3} ref={chartExportRef}>
+            {isMetricEnabled('platform.overview') ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} lg={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Total Users
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {platformStats.userStatistics.totalUsers}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {platformStats.userStatistics.totalActiveAccounts} active
+                      accounts
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} lg={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Active Users
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {platformStats.userStatistics.activeUsers.mau}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      DAU {platformStats.userStatistics.activeUsers.dau} | WAU{' '}
+                      {platformStats.userStatistics.activeUsers.wau}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} lg={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Health Score
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {platformStats.systemHealth.healthScore}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {platformStats.systemHealth.failedLoginsLast24h} failed
+                      logins in 24h
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} lg={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Moderation Queue
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {moderationQueue.queue.pendingTotal}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {moderationQueue.throughput.processedInPeriod} processed
+                      this period
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            ) : null}
+
+            {isMetricEnabled('platform.activity') ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      User Growth Snapshot
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Typography variant="body2" color="text.secondary">
+                        New users: {userGrowth.summary.newUsers} | Previous
+                        period: {userGrowth.summary.previousPeriodNewUsers}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Growth rate: {userGrowth.summary.growthRatePercent}% |
+                        Avg/day: {userGrowth.summary.averageNewUsersPerDay}
+                      </Typography>
+                      <Divider />
+                      {latestNewUsers.map((item) => (
+                        <Box
+                          key={item.date}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.date}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      User Mix
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      {platformStats.userStatistics.byRole.map((item) => (
+                        <Box
+                          key={item.role}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.role}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                      <Divider />
+                      {platformStats.userStatistics.byStatus.map((item) => (
+                        <Box
+                          key={item.status}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.status}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+              </Grid>
+            ) : null}
+
+            {isMetricEnabled('platform.content') ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      Content Creation Rates
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      <Typography variant="body2" color="text.secondary">
+                        Average content created per day:{' '}
+                        {contentStats.creationRates.averagePerDay}
+                      </Typography>
+                      {Object.entries(
+                        contentStats.creationRates.byTypePerDay
+                      ).map(([key, value]) => (
+                        <Box
+                          key={key}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ textTransform: 'capitalize' }}
+                          >
+                            {key}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      Recent Content Trend
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      {latestContentTrend.map((item) => (
+                        <Box
+                          key={item.date}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.date}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.total} total
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+              </Grid>
+            ) : null}
+
+            {isMetricEnabled('platform.moderation') ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      Moderation Queue Details
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Typography variant="body2" color="text.secondary">
+                        Pending: {moderationQueue.queue.pendingTotal} | Avg
+                        resolution:{' '}
+                        {moderationQueue.throughput.averageResolutionHours}h
+                      </Typography>
+                      <Typography variant="body2">
+                        &lt;24h:{' '}
+                        {moderationQueue.queue.pendingAging.lessThan24h}
+                      </Typography>
+                      <Typography variant="body2">
+                        24-72h:{' '}
+                        {moderationQueue.queue.pendingAging.between24hAnd72h}
+                      </Typography>
+                      <Typography variant="body2">
+                        &gt;72h:{' '}
+                        {moderationQueue.queue.pendingAging.greaterThan72h}
+                      </Typography>
+                      <Divider />
+                      {moderationQueue.queue.pendingByType.map((item) => (
+                        <Box
+                          key={item.type}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.type}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} lg={6}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                      Reports and Reasons
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      {latestModerationTrend.map((item) => (
+                        <Box
+                          key={item.date}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2">{item.date}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                      <Divider />
+                      {moderationQueue.queue.topPendingReasons.map((item) => (
+                        <Box
+                          key={item.reason}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ maxWidth: '75%' }}>
+                            {item.reason}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {item.count}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+              </Grid>
+            ) : null}
+          </Stack>
+        ) : loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <Typography color="text.secondary">
+              Loading platform insights...
+            </Typography>
           </Box>
         )
       ) : null}

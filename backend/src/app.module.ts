@@ -27,6 +27,7 @@ import { ShowcaseModule } from './showcase/showcase.module';
 import { NewsModule } from './news/news.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReferralAnalyticsModule } from './referral-analytics/referral-analytics.module';
+import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ExportModule } from './export/export.module';
@@ -86,6 +87,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
     NewsModule,
     DashboardModule,
     ReferralAnalyticsModule,
+    AdminAnalyticsModule,
     HealthModule,
     MetricsModule,
     ExportModule,

@@ -216,7 +216,9 @@ export class PushNotificationService {
    */
   async registerDeviceToken(userId: string, token: string): Promise<boolean> {
     // FCM feature disabled - no-op (keep method for backward compatibility)
-    this.logger.debug(`FCM token registration requested for user ${userId} (feature disabled)`);
+    this.logger.debug(
+      `FCM token registration requested for user ${userId} (feature disabled, tokenLength=${token.length})`,
+    );
     return true;
   }
 
