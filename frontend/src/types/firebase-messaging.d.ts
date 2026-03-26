@@ -1,7 +1,7 @@
 declare module 'firebase/messaging' {
   import type { FirebaseApp } from 'firebase/app';
 
-  export interface Messaging {}
+  export type Messaging = object;
 
   export interface MessagePayload {
     notification?: {
@@ -15,11 +15,11 @@ declare module 'firebase/messaging' {
 
   export function getToken(
     messaging: Messaging,
-    options?: { vapidKey?: string },
+    options?: { vapidKey?: string }
   ): Promise<string>;
 
   export function onMessage(
     messaging: Messaging,
-    nextOrObserver: (payload: MessagePayload) => void,
+    nextOrObserver: (payload: MessagePayload) => void
   ): () => void;
 }
