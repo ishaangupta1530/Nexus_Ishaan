@@ -9,6 +9,8 @@ import {
   Stack,
   TextField,
   Typography,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '@/services/api';
@@ -18,12 +20,30 @@ import connectionAnalyticsService, {
   type ConnectionGrowthResponse,
   type ConnectionStrengthResponse,
 } from '@/services/connectionAnalyticsService';
+import engagementAnalyticsService, {
+  type EngagementAnalyticsPeriod,
+  type EngagementSummaryData,
+  type EngagementSummaryResponse,
+  type ActivityHeatmapResponse,
+  type ContentPerformanceResponse,
+} from '@/services/engagementAnalyticsService';
 import ConnectionGrowthChart from '@/components/Analytics/Connections/ConnectionGrowthChart';
 import ConnectionDistributionChart from '@/components/Analytics/Connections/ConnectionDistributionChart';
 import NetworkStrengthGauge from '@/components/Analytics/Connections/NetworkStrengthGauge';
 import ConnectionMetricsCard from '@/components/Analytics/Connections/ConnectionMetricsCard';
+import ActivityHeatmap from '@/components/Analytics/Engagement/ActivityHeatmap';
+import EngagementAreaChart from '@/components/Analytics/Engagement/EngagementAreaChart';
+import ContentPerformanceChart from '@/components/Analytics/Engagement/ContentPerformanceChart';
+import EngagementMetricsCard from '@/components/Analytics/Engagement/EngagementMetricsCard';
 
 const PERIOD_OPTIONS: Array<{ label: string; value: ConnectionAnalyticsPeriod }> = [
+  { label: 'Last 7 Days', value: '7d' },
+  { label: 'Last 30 Days', value: '30d' },
+  { label: 'Last 90 Days', value: '90d' },
+  { label: 'Last 1 Year', value: '1y' },
+];
+
+const ENGAGEMENT_PERIOD_OPTIONS: Array<{ label: string; value: EngagementAnalyticsPeriod }> = [
   { label: 'Last 7 Days', value: '7d' },
   { label: 'Last 30 Days', value: '30d' },
   { label: 'Last 90 Days', value: '90d' },
@@ -37,13 +57,30 @@ type AdminUserOption = {
   role: string;
 };
 
+type TabType = 'connections' | 'engagement';
+
 const AdminAnalyticsPage: FC = () => {
   const { user } = useAuth();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>('connections');
+  
+  // Connection analytics state
   const [period, setPeriod] = useState<ConnectionAnalyticsPeriod>('30d');
   const [targetUserId, setTargetUserId] = useState('');
   const [growth, setGrowth] = useState<ConnectionGrowthResponse | null>(null);
   const [distribution, setDistribution] = useState<ConnectionDistributionResponse | null>(null);
   const [strength, setStrength] = useState<ConnectionStrengthResponse | null>(null);
+  
+  // Engagement analytics state
+  const [engagementPeriod, setEngagementPeriod] = useState<EngagementAnalyticsPeriod>('30d');
+  const [engagementSummary, setEngagementSummary] = useState<EngagementSummaryResponse | null>(null);
+  const [heatmap, setHeatmap] = useState<ActivityHeatmapResponse | null>(null);
+  const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
+  const [contentPerformance, setContentPerformance] = useState<ContentPerformanceResponse | null>(null);
+  const [contentPerfPage, setContentPerfPage] = useState(1);
+  
+  // General state
   const [userOptions, setUserOptions] = useState<AdminUserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,7 +101,10 @@ const AdminAnalyticsPage: FC = () => {
       setLoadingUsers(true);
       try {
         const response = await apiService.users.getAll();
-        const users = (response.data || []) as AdminUserOption[];
+        const raw = response.data as unknown;
+        const users = Array.isArray(raw)
+          ? (raw as AdminUserOption[])
+          : ((raw as { users?: AdminUserOption[] })?.users || []);
         setUserOptions(users);
       } catch (err) {
         console.error('Failed to load users for analytics selector', err);
@@ -76,7 +116,8 @@ const AdminAnalyticsPage: FC = () => {
     void loadUsers();
   }, [user?.role]);
 
-  const loadAnalytics = useCallback(async () => {
+  // Load connection analytics
+  const loadConnectionAnalytics = useCallback(async () => {
     if (!targetUserId) {
       setError('Target user ID is required to fetch analytics.');
       return;
@@ -103,13 +144,61 @@ const AdminAnalyticsPage: FC = () => {
     }
   }, [period, targetUserId]);
 
-  useEffect(() => {
-    if (targetUserId) {
-      void loadAnalytics();
+  // Load engagement analytics
+  const loadEngagementAnalytics = useCallback(async () => {
+    if (!targetUserId) {
+      setError('Target user ID is required to fetch analytics.');
+      return;
     }
-  }, [targetUserId, loadAnalytics]);
 
-  const metrics = useMemo(() => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [summaryRes, heatmapRes, perfRes] = await Promise.allSettled([
+        engagementAnalyticsService.getSummary(targetUserId, engagementPeriod),
+        engagementAnalyticsService.getHeatmap(targetUserId, heatmapYear),
+        engagementAnalyticsService.getContentPerformance(targetUserId, contentPerfPage, 10),
+      ]);
+
+      if (summaryRes.status === 'fulfilled') {
+        setEngagementSummary(summaryRes.value.data);
+      }
+      if (heatmapRes.status === 'fulfilled') {
+        setHeatmap(heatmapRes.value.data);
+      }
+      if (perfRes.status === 'fulfilled') {
+        setContentPerformance(perfRes.value.data);
+      }
+
+      if (
+        summaryRes.status === 'rejected' &&
+        heatmapRes.status === 'rejected' &&
+        perfRes.status === 'rejected'
+      ) {
+        throw new Error('All engagement analytics requests failed');
+      }
+    } catch (err) {
+      console.error('Failed to load engagement analytics', err);
+      setError('Failed to load engagement analytics. Ensure your admin token is valid and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [targetUserId, engagementPeriod, heatmapYear, contentPerfPage]);
+
+  useEffect(() => {
+    if (targetUserId && activeTab === 'connections') {
+      void loadConnectionAnalytics();
+    }
+  }, [targetUserId, period, activeTab, loadConnectionAnalytics]);
+
+  useEffect(() => {
+    if (targetUserId && activeTab === 'engagement') {
+      void loadEngagementAnalytics();
+    }
+  }, [targetUserId, activeTab, loadEngagementAnalytics]);
+
+  const connectionMetrics = useMemo(() => {
     if (!growth || !strength || !distribution) {
       return [];
     }
@@ -126,49 +215,88 @@ const AdminAnalyticsPage: FC = () => {
     ];
   }, [distribution, growth, strength, period]);
 
+  const selectedUserExists = useMemo(
+    () => userOptions.some((option) => option.id === targetUserId),
+    [targetUserId, userOptions],
+  );
+
+  const engagementData = useMemo<EngagementSummaryData | null>(() => {
+    if (!engagementSummary) {
+      return null;
+    }
+
+    return {
+      period: engagementSummary.period,
+      timeline: engagementSummary.timeline,
+      ...engagementSummary.summary,
+    };
+  }, [engagementSummary]);
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Stack spacing={2} sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          Admin Connection Analytics
+          Admin Analytics Dashboard
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Connection growth, distribution, network strength, and velocity analytics.
+          Comprehensive analytics for connections, engagement, and performance metrics.
         </Typography>
       </Stack>
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Period"
-            select
-            value={period}
-            onChange={(event) => setPeriod(event.target.value as ConnectionAnalyticsPeriod)}
-          >
-            {PERIOD_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
+      {/* Tab navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value as TabType)}>
+          <Tab label="Connection Analytics" value="connections" />
+          <Tab label="Engagement Analytics" value="engagement" />
+        </Tabs>
+      </Box>
 
-        <Grid item xs={12} md={8}>
+      {/* Shared controls */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={6}>
           <TextField
             fullWidth
             label="Target User"
             select
-            value={targetUserId}
+            value={selectedUserExists ? targetUserId : ''}
             onChange={(event) => setTargetUserId(event.target.value)}
-            helperText="Select a user account to inspect connection analytics"
-            disabled={loadingUsers}
+            helperText="Select a user account to inspect analytics"
+            disabled={loadingUsers || userOptions.length === 0}
           >
+            {userOptions.length === 0 ? (
+              <MenuItem value="" disabled>
+                No users available
+              </MenuItem>
+            ) : null}
             {userOptions.map((option) => (
               <MenuItem key={option.id} value={option.id}>
                 {`${option.name || 'Unnamed User'} (${option.email}) - ${option.role}`}
               </MenuItem>
             ))}
+          </TextField>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Period"
+            select
+            value={activeTab === 'connections' ? period : engagementPeriod}
+            onChange={(event) => {
+              if (activeTab === 'connections') {
+                setPeriod(event.target.value as ConnectionAnalyticsPeriod);
+              } else {
+                setEngagementPeriod(event.target.value as EngagementAnalyticsPeriod);
+              }
+            }}
+          >
+            {(activeTab === 'connections' ? PERIOD_OPTIONS : ENGAGEMENT_PERIOD_OPTIONS).map(
+              (option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              )
+            )}
           </TextField>
         </Grid>
       </Grid>
@@ -181,9 +309,10 @@ const AdminAnalyticsPage: FC = () => {
         </Box>
       ) : null}
 
-      {!loading && growth && distribution && strength ? (
+      {/* Connection Analytics Tab */}
+      {!loading && activeTab === 'connections' && growth && distribution && strength ? (
         <Stack spacing={3}>
-          <ConnectionMetricsCard metrics={metrics} />
+          <ConnectionMetricsCard metrics={connectionMetrics} />
 
           <Grid container spacing={3}>
             <Grid item xs={12} lg={8}>
@@ -196,6 +325,40 @@ const AdminAnalyticsPage: FC = () => {
 
           <ConnectionDistributionChart distribution={distribution} />
         </Stack>
+      ) : null}
+
+      {/* Engagement Analytics Tab */}
+      {activeTab === 'engagement' ? (
+        !loading && engagementData && heatmap && contentPerformance ? (
+          <Stack spacing={3}>
+            <EngagementMetricsCard data={engagementData} />
+
+            <ActivityHeatmap
+              data={heatmap}
+              onYearChange={setHeatmapYear}
+              isLoading={loading}
+            />
+
+            <EngagementAreaChart
+              data={engagementData}
+              isLoading={loading}
+            />
+
+            <ContentPerformanceChart
+              data={contentPerformance}
+              onPageChange={setContentPerfPage}
+              isLoading={loading}
+            />
+          </Stack>
+        ) : loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <Typography color="text.secondary">Loading engagement analytics...</Typography>
+          </Box>
+        )
       ) : null}
     </Container>
   );
