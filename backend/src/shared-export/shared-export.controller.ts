@@ -11,10 +11,17 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
 import { SharedExportService } from './shared-export.service';
+import { CreateSharedExportDto } from './dto/create-shared-export.dto';
+import { UpdateSharedExportDto } from './dto/update-shared-export.dto';
 
 @ApiTags('Shared Exports')
 @Controller('shared-exports')
@@ -32,7 +39,8 @@ export class SharedExportController {
     schema: {
       example: {
         shareToken: 'd41d8cd98f00b204e9800998ecf8427e',
-        shareUrl: 'http://localhost:3001/shared-export/d41d8cd98f00b204e9800998ecf8427e',
+        shareUrl:
+          'http://localhost:3001/shared-export/d41d8cd98f00b204e9800998ecf8427e',
         expiresAt: '2024-02-01T00:00:00Z',
         maxViews: 10,
       },
@@ -40,7 +48,7 @@ export class SharedExportController {
   })
   async createSharedExport(
     @GetCurrentUser('userId') userId: string,
-    @Body() dto: any,
+    @Body() dto: CreateSharedExportDto,
   ) {
     return this.sharedExportService.createSharedExport(userId, dto);
   }
@@ -79,18 +87,22 @@ export class SharedExportController {
     @Param('token') shareToken: string,
     @Body('password') password?: string,
   ) {
-    return this.sharedExportService.accessSharedExport(shareToken, { password });
+    return this.sharedExportService.accessSharedExport(shareToken, {
+      password,
+    });
   }
 
   @Get(':token')
-  @ApiOperation({ summary: 'Get shared export link details (public, no password - returns basic info only)' })
+  @ApiOperation({
+    summary:
+      'Get shared export link details (public, no password - returns basic info only)',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Shared export metadata (requires POST :token/access for full access)',
+    description:
+      'Shared export metadata (requires POST :token/access for full access)',
   })
-  async getSharedExportMetadata(
-    @Param('token') shareToken: string,
-  ) {
+  async getSharedExportMetadata(@Param('token') shareToken: string) {
     return this.sharedExportService.getSharedExportMetadata(shareToken);
   }
 
@@ -137,7 +149,7 @@ export class SharedExportController {
   async updateSharedExport(
     @GetCurrentUser('userId') userId: string,
     @Param('token') shareToken: string,
-    @Body() dto: any,
+    @Body() dto: UpdateSharedExportDto,
   ) {
     return this.sharedExportService.updateSharedExport(shareToken, userId, dto);
   }

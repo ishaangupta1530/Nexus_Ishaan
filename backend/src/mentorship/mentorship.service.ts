@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMentorSettingsDto } from './dto/create-mentor-settings.dto';
 import { UpdateMentorSettingsDto } from './dto/update-mentor-settings.dto';
@@ -540,7 +544,7 @@ export class MentorshipService {
     requesterId: string,
   ) {
     if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
-      throw new Error('Unauthorized access');
+      throw new ForbiddenException('Unauthorized access');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -549,7 +553,7 @@ export class MentorshipService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const mentorshipWhere =
@@ -609,12 +613,14 @@ export class MentorshipService {
       (meeting) => meeting.status === MeetingStatus.CONFIRMED,
     );
 
-    const mentorshipHoursLogged = Math.round(
-      completedMeetings.reduce((sum, meeting) => {
-        const diffMs = meeting.endTime.getTime() - meeting.startTime.getTime();
-        return sum + Math.max(0, diffMs / (1000 * 60 * 60));
-      }, 0) * 100,
-    ) / 100;
+    const mentorshipHoursLogged =
+      Math.round(
+        completedMeetings.reduce((sum, meeting) => {
+          const diffMs =
+            meeting.endTime.getTime() - meeting.startTime.getTime();
+          return sum + Math.max(0, diffMs / (1000 * 60 * 60));
+        }, 0) * 100,
+      ) / 100;
 
     const completionRate =
       totalMeetings > 0
@@ -644,7 +650,8 @@ export class MentorshipService {
 
     const completedGoals = mentorships.reduce(
       (sum, mentorship) =>
-        sum + mentorship.goals.filter((goal) => goal.status === 'COMPLETED').length,
+        sum +
+        mentorship.goals.filter((goal) => goal.status === 'COMPLETED').length,
       0,
     );
     const totalGoals = mentorships.reduce(
@@ -683,7 +690,7 @@ export class MentorshipService {
     requesterId: string,
   ) {
     if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
-      throw new Error('Unauthorized access');
+      throw new ForbiddenException('Unauthorized access');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -692,7 +699,7 @@ export class MentorshipService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const mentorshipWhere =
@@ -737,15 +744,17 @@ export class MentorshipService {
       .flatMap((mentorship) => mentorship.goals)
       .filter((goal) => goal.status === 'COMPLETED').length;
 
-    const totalMilestones = mentorships
-      .flatMap((mentorship) => mentorship.goals)
-      .length;
+    const totalMilestones = mentorships.flatMap(
+      (mentorship) => mentorship.goals,
+    ).length;
 
     const impactScore =
       mentorships.length > 0
         ? Math.round(
-            mentorships.reduce((sum, mentorship) => sum + mentorship.progress, 0) /
-              mentorships.length,
+            mentorships.reduce(
+              (sum, mentorship) => sum + mentorship.progress,
+              0,
+            ) / mentorships.length,
           )
         : 0;
 

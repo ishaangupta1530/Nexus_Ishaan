@@ -1,6 +1,5 @@
 import { FC, useMemo, useState } from 'react';
 import {
-  Box,
   Card,
   CardContent,
   Stack,
@@ -14,7 +13,15 @@ import { type ConnectionDistributionResponse } from '@/services/connectionAnalyt
 type ViewMode = 'role' | 'year' | 'location';
 
 const ROLE_COLORS = ['#2563eb', '#0891b2', '#14b8a6', '#0f766e'];
-const GENERAL_COLORS = ['#ef4444', '#f59e0b', '#84cc16', '#06b6d4', '#6366f1', '#d946ef', '#ec4899'];
+const GENERAL_COLORS = [
+  '#ef4444',
+  '#f59e0b',
+  '#84cc16',
+  '#06b6d4',
+  '#6366f1',
+  '#d946ef',
+  '#ec4899',
+];
 
 interface ConnectionDistributionChartProps {
   distribution: ConnectionDistributionResponse;
@@ -56,8 +63,6 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
       fill: colors[index % colors.length],
     }));
 
-  const summary = `Connection distribution ${activeView} chart with ${visibleData.length} visible categories and ${distribution.totalConnections} total connections.`;
-
   return (
     <Card>
       <CardContent>
@@ -90,7 +95,6 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
         </Stack>
 
         <ResponsiveContainer width="100%" height={300}>
-          <Box role="img" aria-label={summary} sx={{ width: '100%', height: '100%' }}>
           <PieChart>
             <Pie
               data={visibleData}
@@ -98,14 +102,16 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
               nameKey="label"
               outerRadius={110}
               label={(entry) => {
-                const total = visibleData.reduce((sum, item) => sum + item.value, 0);
+                const total = visibleData.reduce(
+                  (sum, item) => sum + item.value,
+                  0
+                );
                 const pct = total > 0 ? (entry.value / total) * 100 : 0;
                 return `${pct.toFixed(1)}%`;
               }}
             />
             <Tooltip />
           </PieChart>
-          </Box>
         </ResponsiveContainer>
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

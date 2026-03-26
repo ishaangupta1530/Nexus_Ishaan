@@ -5,7 +5,7 @@
  * any required environment variable is absent or has an invalid value.
  * This prevents cryptic runtime failures minutes after a bad deploy.
  *
- * Required variables:   DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL
+ * Required variables:   DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET
  * Optional with defaults: PORT, NODE_ENV, FRONTEND_URL, JWT_ACCESS_EXPIRY, …
  */
 import * as Joi from 'joi';
@@ -53,6 +53,8 @@ export const envValidationSchema = Joi.object({
     .description('Redis connection URL, e.g. redis://localhost:6379'),
 
   REDIS_TTL: Joi.number().integer().positive().default(3600),
+
+  DISABLE_REDIS: Joi.boolean().default(false),
 
   // ─── Security / Rate-Limiting ──────────────────────────────────────────────
   THROTTLE_TTL: Joi.number().integer().positive().default(60),

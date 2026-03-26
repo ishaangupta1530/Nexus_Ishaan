@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Card, CardContent, Chip, Stack, Typography } from '@mui/material';
 import {
   Area,
   AreaChart,
@@ -58,11 +58,6 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
           </Stack>
 
           <ResponsiveContainer width="100%" height={320}>
-            <Box
-              role="img"
-              aria-label={summary}
-              sx={{ width: '100%', height: '100%' }}
-            >
             {chartType === 'line' ? (
               <LineChart data={growth.data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -70,8 +65,10 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
                 <YAxis allowDecimals={false} />
                 <Tooltip
                   formatter={(value, key) => {
-                    if (key === 'newConnections') return [value, 'New Connections'];
-                    if (key === 'totalConnections') return [value, 'Total Connections'];
+                    if (key === 'newConnections')
+                      return [value, 'New Connections'];
+                    if (key === 'totalConnections')
+                      return [value, 'Total Connections'];
                     return [value, String(key)];
                   }}
                 />
@@ -102,8 +99,10 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
                 <YAxis allowDecimals={false} />
                 <Tooltip
                   formatter={(value, key) => {
-                    if (key === 'newConnections') return [value, 'New Connections'];
-                    if (key === 'totalConnections') return [value, 'Total Connections'];
+                    if (key === 'newConnections')
+                      return [value, 'New Connections'];
+                    if (key === 'totalConnections')
+                      return [value, 'Total Connections'];
                     return [value, String(key)];
                   }}
                 />
@@ -124,7 +123,6 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
                 />
               </AreaChart>
             )}
-            </Box>
           </ResponsiveContainer>
           <Typography
             variant="caption"

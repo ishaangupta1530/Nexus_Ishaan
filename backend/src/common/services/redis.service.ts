@@ -11,18 +11,61 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly logger: WinstonLoggerService) {}
 
   async onModuleInit() {
-    // Always use mock Redis clients - Redis is completely bypassed
-    this.logger.log('🔇 Redis bypassed - using in-memory mock clients', 'RedisService');
-    
-    this.client = this.createMockRedisClient();
-    this.subscriber = this.createMockRedisClient();
-    this.publisher = this.createMockRedisClient();
+    const disableRedisEnv = process.env.DISABLE_REDIS;
+    const redisUrl = process.env.REDIS_URL;
+    const redisHost = process.env.REDIS_HOST;
+    const redisPort = process.env.REDIS_PORT
+      ? parseInt(process.env.REDIS_PORT, 10)
+      : 6379;
+
+    const disableRedis =
+      disableRedisEnv === 'true' ||
+      disableRedisEnv === '1' ||
+      (!redisUrl && !redisHost);
+
+    if (disableRedis) {
+      this.logger.log(
+        '🔇 Redis bypassed - using in-memory mock clients',
+        'RedisService',
+      );
+      this.client = this.createMockRedisClient();
+      this.subscriber = this.createMockRedisClient();
+      this.publisher = this.createMockRedisClient();
+      return;
+    }
+
+    try {
+      if (redisUrl) {
+        this.logger.log('🔌 Redis enabled via REDIS_URL', 'RedisService');
+        this.client = new Redis(redisUrl);
+        this.subscriber = new Redis(redisUrl);
+        this.publisher = new Redis(redisUrl);
+      } else {
+        this.logger.log(
+          `🔌 Redis enabled via host/port (${redisHost}:${redisPort})`,
+          'RedisService',
+        );
+        this.client = new Redis({ host: redisHost, port: redisPort });
+        this.subscriber = new Redis({ host: redisHost, port: redisPort });
+        this.publisher = new Redis({ host: redisHost, port: redisPort });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Redis initialization failed, falling back to mock clients: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+        'RedisService',
+      );
+      this.client = this.createMockRedisClient();
+      this.subscriber = this.createMockRedisClient();
+      this.publisher = this.createMockRedisClient();
+    }
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
-    await this.subscriber.quit();
-    await this.publisher.quit();
+    await this.client?.quit();
+    await this.subscriber?.quit();
+    await this.publisher?.quit();
     this.logger.log('Redis connections closed', 'RedisService');
   }
 

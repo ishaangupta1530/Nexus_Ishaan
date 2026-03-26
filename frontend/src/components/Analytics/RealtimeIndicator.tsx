@@ -10,11 +10,14 @@ interface Props {
   onAnalyticsUpdate?: () => void;
 }
 
-const STATUS_CONFIG: Record<Status, { color: string; label: string; pulse: boolean }> = {
-  connected:    { color: '#4caf50', label: 'Live',           pulse: true  },
-  connecting:   { color: '#ff9800', label: 'Connecting…',   pulse: false },
+const STATUS_CONFIG: Record<
+  Status,
+  { color: string; label: string; pulse: boolean }
+> = {
+  connected: { color: '#4caf50', label: 'Live', pulse: true },
+  connecting: { color: '#ff9800', label: 'Connecting…', pulse: false },
   reconnecting: { color: '#ff9800', label: 'Reconnecting…', pulse: false },
-  disconnected: { color: '#f44336', label: 'Disconnected',  pulse: false },
+  disconnected: { color: '#f44336', label: 'Disconnected', pulse: false },
 };
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string) ?? '';
@@ -29,14 +32,16 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
 
   // Stable reference for the callback so the effect doesn't re-run on each render
   const onUpdateRef = useRef(onAnalyticsUpdate);
-  useEffect(() => { onUpdateRef.current = onAnalyticsUpdate; }, [onAnalyticsUpdate]);
+  useEffect(() => {
+    onUpdateRef.current = onAnalyticsUpdate;
+  }, [onAnalyticsUpdate]);
 
   const connect = useCallback(() => {
     if (unmountedRef.current) return;
     setStatus('connecting');
 
     const socket = io(`${BACKEND_URL}/dashboard`, {
-      query: { userId, token },
+      auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: false,
       timeout: 10_000,
@@ -50,7 +55,7 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
       if (unmountedRef.current) return;
       attemptsRef.current = 0;
       setStatus('connected');
-      socket.emit('subscribe', { channels: ['analytics'] });
+      socket.emit('subscribe', { channels: ['analytics'], userId });
     });
 
     const scheduleReconnect = () => {
@@ -101,7 +106,15 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
 
   return (
     <Tooltip title={`WebSocket: ${cfg.label}`} arrow>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'default', userSelect: 'none' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.75,
+          cursor: 'default',
+          userSelect: 'none',
+        }}
+      >
         <Box
           sx={{
             width: 10,
@@ -110,14 +123,18 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
             backgroundColor: cfg.color,
             flexShrink: 0,
             '@keyframes rtPulse': {
-              '0%':   { boxShadow: `0 0 0 0 ${cfg.color}80` },
-              '70%':  { boxShadow: `0 0 0 7px transparent` },
+              '0%': { boxShadow: `0 0 0 0 ${cfg.color}80` },
+              '70%': { boxShadow: `0 0 0 7px transparent` },
               '100%': { boxShadow: `0 0 0 0 transparent` },
             },
             animation: cfg.pulse ? 'rtPulse 2s ease-out infinite' : 'none',
           }}
         />
-        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ whiteSpace: 'nowrap' }}
+        >
           {cfg.label}
         </Typography>
       </Box>
