@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus, Role } from '@prisma/client';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 
 /**
@@ -11,6 +11,243 @@ import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 @Injectable()
 export class ReferralAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getReferralConversionAnalytics(
+    targetUserId: string,
+    requesterRole: Role,
+    requesterId: string,
+  ) {
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const perspective =
+      targetUser.role === Role.ADMIN
+        ? 'admin'
+        : targetUser.role === Role.ALUM || targetUser.role === Role.MENTOR
+          ? 'alumni'
+          : 'student';
+
+    const referralWhere =
+      perspective === 'alumni' ? { alumniId: targetUserId } : {};
+    const applicationWhere =
+      perspective === 'alumni'
+        ? { referral: { alumniId: targetUserId } }
+        : perspective === 'student'
+          ? { applicantId: targetUserId }
+          : {};
+
+    const [referralsPosted, referralsApplied, statusRows, appRows] =
+      await Promise.all([
+        this.prisma.referral.count({ where: referralWhere }),
+        this.prisma.referralApplication.count({ where: applicationWhere }),
+        this.prisma.referralApplication.groupBy({
+          by: ['status'],
+          where: applicationWhere,
+          _count: { _all: true },
+        }),
+        this.prisma.referralApplication.findMany({
+          where: applicationWhere,
+          select: {
+            status: true,
+            referral: {
+              select: {
+                company: true,
+                jobTitle: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+    const successfulApplications = statusRows.find(
+      (row) => row.status === ApplicationStatus.ACCEPTED,
+    )?._count._all || 0;
+
+    const conversionRate =
+      referralsApplied > 0
+        ? Math.round((successfulApplications / referralsApplied) * 10000) / 100
+        : 0;
+
+    const applicationStatusDistribution = this.mapStatusCounts(statusRows);
+
+    const successByIndustryMap = new Map<
+      string,
+      { industry: string; total: number; successful: number }
+    >();
+    const successByRoleMap = new Map<
+      string,
+      { role: string; total: number; successful: number }
+    >();
+
+    appRows.forEach((row) => {
+      const industry = row.referral.company || 'Unknown';
+      const role = row.referral.jobTitle || 'Unknown';
+      const isSuccess = row.status === ApplicationStatus.ACCEPTED;
+
+      const industryEntry = successByIndustryMap.get(industry) || {
+        industry,
+        total: 0,
+        successful: 0,
+      };
+      industryEntry.total += 1;
+      industryEntry.successful += isSuccess ? 1 : 0;
+      successByIndustryMap.set(industry, industryEntry);
+
+      const roleEntry = successByRoleMap.get(role) || {
+        role,
+        total: 0,
+        successful: 0,
+      };
+      roleEntry.total += 1;
+      roleEntry.successful += isSuccess ? 1 : 0;
+      successByRoleMap.set(role, roleEntry);
+    });
+
+    const successByIndustry = Array.from(successByIndustryMap.values())
+      .map((entry) => ({
+        ...entry,
+        successRate:
+          entry.total > 0
+            ? Math.round((entry.successful / entry.total) * 10000) / 100
+            : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const successByRole = Array.from(successByRoleMap.values())
+      .map((entry) => ({
+        ...entry,
+        successRate:
+          entry.total > 0
+            ? Math.round((entry.successful / entry.total) * 10000) / 100
+            : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      userId: targetUserId,
+      perspective,
+      metrics: {
+        referralsPosted,
+        referralsApplied,
+        successfulApplications,
+        conversionRate,
+      },
+      applicationStatusDistribution,
+      successByIndustry,
+      successByRole,
+      computedAt: new Date().toISOString(),
+    };
+  }
+
+  async getReferralFunnelAnalytics(
+    targetUserId: string,
+    requesterRole: Role,
+    requesterId: string,
+  ) {
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const perspective =
+      targetUser.role === Role.ADMIN
+        ? 'admin'
+        : targetUser.role === Role.ALUM || targetUser.role === Role.MENTOR
+          ? 'alumni'
+          : 'student';
+
+    const referralWhere =
+      perspective === 'alumni' ? { alumniId: targetUserId } : {};
+    const applicationWhere =
+      perspective === 'alumni'
+        ? { referral: { alumniId: targetUserId } }
+        : perspective === 'student'
+          ? { applicantId: targetUserId }
+          : {};
+
+    const [totalViews, totalApplications, statusRows] = await Promise.all([
+      this.prisma.referral.aggregate({
+        where: referralWhere,
+        _sum: { viewCount: true },
+      }),
+      this.prisma.referralApplication.count({ where: applicationWhere }),
+      this.prisma.referralApplication.groupBy({
+        by: ['status'],
+        where: applicationWhere,
+        _count: { _all: true },
+      }),
+    ]);
+
+    const statusCounts = this.mapStatusCounts(statusRows);
+
+    const reviewed =
+      (statusCounts[ApplicationStatus.REVIEWED] || 0) +
+      (statusCounts[ApplicationStatus.SHORTLISTED] || 0) +
+      (statusCounts[ApplicationStatus.OFFERED] || 0) +
+      (statusCounts[ApplicationStatus.ACCEPTED] || 0);
+    const shortlisted =
+      (statusCounts[ApplicationStatus.SHORTLISTED] || 0) +
+      (statusCounts[ApplicationStatus.OFFERED] || 0) +
+      (statusCounts[ApplicationStatus.ACCEPTED] || 0);
+    const offered =
+      (statusCounts[ApplicationStatus.OFFERED] || 0) +
+      (statusCounts[ApplicationStatus.ACCEPTED] || 0);
+    const accepted = statusCounts[ApplicationStatus.ACCEPTED] || 0;
+    const viewed = totalViews._sum.viewCount || 0;
+
+    const stages = [
+      { stage: 'Viewed', count: viewed },
+      { stage: 'Applied', count: totalApplications },
+      { stage: 'Reviewed', count: reviewed },
+      { stage: 'Shortlisted', count: shortlisted },
+      { stage: 'Offered', count: offered },
+      { stage: 'Accepted', count: accepted },
+    ];
+
+    const firstStage = stages[0]?.count || 0;
+    const funnel = stages.map((stage, idx) => {
+      const prev = idx > 0 ? stages[idx - 1].count : stage.count;
+      const dropOffRate =
+        idx === 0 || prev === 0
+          ? 0
+          : Math.round(((prev - stage.count) / prev) * 10000) / 100;
+      const conversionRate =
+        firstStage > 0
+          ? Math.round((stage.count / firstStage) * 10000) / 100
+          : 0;
+
+      return {
+        ...stage,
+        dropOffRate,
+        conversionRate,
+      };
+    });
+
+    return {
+      userId: targetUserId,
+      perspective,
+      funnel,
+      computedAt: new Date().toISOString(),
+    };
+  }
 
   /**
    * Computes analytics for a specific alumni user.

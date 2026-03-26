@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MentorshipController } from './mentorship.controller';
+import { MentorshipAnalyticsController } from './mentorship-analytics.controller';
 import { MentorshipService } from './mentorship.service';
 import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [NotificationModule],
-  controllers: [MentorshipController],
+  controllers: [MentorshipController, MentorshipAnalyticsController],
   providers: [MentorshipService],
 })
 export class MentorshipModule {}

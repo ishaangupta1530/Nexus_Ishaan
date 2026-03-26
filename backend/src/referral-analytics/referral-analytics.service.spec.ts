@@ -14,7 +14,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReferralAnalyticsService } from './referral-analytics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus, Role } from '@prisma/client';
 
 describe('ReferralAnalyticsService', () => {
   let service: ReferralAnalyticsService;
@@ -450,6 +450,52 @@ describe('ReferralAnalyticsService', () => {
         where: { id: 'ref-1' },
         data: { viewCount: { increment: 1 } },
       });
+    });
+  });
+
+  describe('Task 4 referral analytics', () => {
+    it('should return zero conversion metrics when no referral/application data exists', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'student-1', role: Role.STUDENT });
+      mockPrisma.referral.count.mockResolvedValue(0);
+      mockPrisma.referralApplication.count.mockResolvedValue(0);
+      mockPrisma.referralApplication.groupBy.mockResolvedValue([]);
+      mockPrisma.referralApplication.findMany.mockResolvedValue([]);
+
+      const result = await service.getReferralConversionAnalytics(
+        'student-1',
+        Role.ADMIN,
+        'admin-1',
+      );
+
+      expect(result.metrics.referralsPosted).toBe(0);
+      expect(result.metrics.referralsApplied).toBe(0);
+      expect(result.metrics.successfulApplications).toBe(0);
+      expect(result.metrics.conversionRate).toBe(0);
+      expect(result.successByIndustry).toHaveLength(0);
+      expect(result.successByRole).toHaveLength(0);
+    });
+
+    it('should handle incomplete funnel stages without errors', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'alum-1', role: Role.ALUM });
+      mockPrisma.referral.aggregate.mockResolvedValue({ _sum: { viewCount: 50 } });
+      mockPrisma.referralApplication.count.mockResolvedValue(10);
+      mockPrisma.referralApplication.groupBy.mockResolvedValue([
+        { status: ApplicationStatus.REVIEWED, _count: { _all: 6 } },
+        { status: ApplicationStatus.REJECTED, _count: { _all: 4 } },
+      ]);
+
+      const result = await service.getReferralFunnelAnalytics(
+        'alum-1',
+        Role.ADMIN,
+        'admin-1',
+      );
+
+      expect(result.funnel).toHaveLength(6);
+      expect(result.funnel.find((s) => s.stage === 'Viewed')?.count).toBe(50);
+      expect(result.funnel.find((s) => s.stage === 'Applied')?.count).toBe(10);
+      expect(result.funnel.find((s) => s.stage === 'Shortlisted')?.count).toBe(0);
+      expect(result.funnel.find((s) => s.stage === 'Offered')?.count).toBe(0);
+      expect(result.funnel.find((s) => s.stage === 'Accepted')?.count).toBe(0);
     });
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronRight, type LucideIcon } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import type { ComponentType } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Collapsible,
@@ -31,7 +32,7 @@ export function NavMainNexus({
   items: {
     title: string;
     url: string;
-    icon?: LucideIcon;
+    icon?: ComponentType<{ className?: string }>;
     isActive?: boolean;
     items?: {
       title: string;

@@ -19,7 +19,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { ContentPerformanceResponse } from '../../services/engagementAnalyticsService';
+import { ContentPerformanceResponse } from '../../../services/engagementAnalyticsService';
 
 interface ContentPerformanceChartProps {
   data: ContentPerformanceResponse;
@@ -35,7 +35,7 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const handlePageChange = useCallback(
-    (event: React.ChangeEvent<unknown>, page: number) => {
+    (_event: React.ChangeEvent<unknown>, page: number) => {
       onPageChange(page);
     },
     [onPageChange],
@@ -148,7 +148,7 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
                 >
                   {chartData.map((entry, index) => (
                     <Cell
-                      key={`cell-${index}`}
+                      key={`cell-${entry.id}`}
                       fill={getBarColor(entry.performance)}
                       opacity={hoveredIndex === null || hoveredIndex === index ? 1 : 0.4}
                     />
@@ -184,8 +184,6 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
                       backgroundColor: 'rgba(0, 0, 0, 0.04)',
                       cursor: 'pointer',
                     },
-                    onMouseEnter: () => setHoveredIndex(idx),
-                    onMouseLeave: () => setHoveredIndex(null),
                   }}
                   onMouseEnter={() => setHoveredIndex(idx)}
                   onMouseLeave={() => setHoveredIndex(null)}

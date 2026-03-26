@@ -9,6 +9,7 @@ import {
   Checkbox,
   FormControlLabel,
 } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   AreaChart,
   Area,
@@ -19,7 +20,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Download } from 'lucide-react';
 import { EngagementSummaryData } from '../../../services/engagementAnalyticsService';
 
 interface EngagementAreaChartProps {
@@ -121,7 +121,7 @@ const EngagementAreaChart: React.FC<EngagementAreaChartProps> = ({
             size="small"
             variant="outlined"
             onClick={handleExportData}
-            startIcon={<Download size={18} />}
+            startIcon={<DownloadIcon fontSize="small" />}
           >
             Export Data
           </Button>

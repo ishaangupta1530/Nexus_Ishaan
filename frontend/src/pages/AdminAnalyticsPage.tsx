@@ -27,6 +27,12 @@ import engagementAnalyticsService, {
   type ActivityHeatmapResponse,
   type ContentPerformanceResponse,
 } from '@/services/engagementAnalyticsService';
+import referralMentorshipAnalyticsService, {
+  type MentorshipImpactResponse,
+  type MentorshipSummaryResponse,
+  type ReferralConversionResponse,
+  type ReferralFunnelResponse,
+} from '@/services/referralMentorshipAnalyticsService';
 import ConnectionGrowthChart from '@/components/Analytics/Connections/ConnectionGrowthChart';
 import ConnectionDistributionChart from '@/components/Analytics/Connections/ConnectionDistributionChart';
 import NetworkStrengthGauge from '@/components/Analytics/Connections/NetworkStrengthGauge';
@@ -35,6 +41,10 @@ import ActivityHeatmap from '@/components/Analytics/Engagement/ActivityHeatmap';
 import EngagementAreaChart from '@/components/Analytics/Engagement/EngagementAreaChart';
 import ContentPerformanceChart from '@/components/Analytics/Engagement/ContentPerformanceChart';
 import EngagementMetricsCard from '@/components/Analytics/Engagement/EngagementMetricsCard';
+import ReferralMetricsCard from '@/components/Analytics/Referrals/ReferralMetricsCard';
+import ApplicationFunnelChart from '@/components/Analytics/Referrals/ApplicationFunnelChart';
+import ReferralSuccessChart from '@/components/Analytics/Referrals/ReferralSuccessChart';
+import MentorshipDashboard from '@/components/Analytics/Referrals/MentorshipDashboard';
 
 const PERIOD_OPTIONS: Array<{ label: string; value: ConnectionAnalyticsPeriod }> = [
   { label: 'Last 7 Days', value: '7d' },
@@ -57,7 +67,7 @@ type AdminUserOption = {
   role: string;
 };
 
-type TabType = 'connections' | 'engagement';
+type TabType = 'connections' | 'engagement' | 'referrals';
 
 const AdminAnalyticsPage: FC = () => {
   const { user } = useAuth();
@@ -79,6 +89,13 @@ const AdminAnalyticsPage: FC = () => {
   const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
   const [contentPerformance, setContentPerformance] = useState<ContentPerformanceResponse | null>(null);
   const [contentPerfPage, setContentPerfPage] = useState(1);
+
+  // Referral and mentorship analytics state
+  const [referralConversion, setReferralConversion] = useState<ReferralConversionResponse | null>(null);
+  const [referralFunnel, setReferralFunnel] = useState<ReferralFunnelResponse | null>(null);
+  const [mentorshipSummary, setMentorshipSummary] = useState<MentorshipSummaryResponse | null>(null);
+  const [mentorshipImpact, setMentorshipImpact] = useState<MentorshipImpactResponse | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = useState('ALL');
   
   // General state
   const [userOptions, setUserOptions] = useState<AdminUserOption[]>([]);
@@ -186,6 +203,53 @@ const AdminAnalyticsPage: FC = () => {
     }
   }, [targetUserId, engagementPeriod, heatmapYear, contentPerfPage]);
 
+  const loadReferralMentorshipAnalytics = useCallback(async () => {
+    if (!targetUserId) {
+      setError('Target user ID is required to fetch analytics.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [conversionRes, funnelRes, mentorshipSummaryRes, mentorshipImpactRes] =
+        await Promise.allSettled([
+          referralMentorshipAnalyticsService.getReferralConversion(targetUserId),
+          referralMentorshipAnalyticsService.getReferralFunnel(targetUserId),
+          referralMentorshipAnalyticsService.getMentorshipSummary(targetUserId),
+          referralMentorshipAnalyticsService.getMentorshipImpact(targetUserId),
+        ]);
+
+      if (conversionRes.status === 'fulfilled') {
+        setReferralConversion(conversionRes.value.data);
+      }
+      if (funnelRes.status === 'fulfilled') {
+        setReferralFunnel(funnelRes.value.data);
+      }
+      if (mentorshipSummaryRes.status === 'fulfilled') {
+        setMentorshipSummary(mentorshipSummaryRes.value.data);
+      }
+      if (mentorshipImpactRes.status === 'fulfilled') {
+        setMentorshipImpact(mentorshipImpactRes.value.data);
+      }
+
+      if (
+        conversionRes.status === 'rejected' &&
+        funnelRes.status === 'rejected' &&
+        mentorshipSummaryRes.status === 'rejected' &&
+        mentorshipImpactRes.status === 'rejected'
+      ) {
+        throw new Error('All referral and mentorship analytics requests failed');
+      }
+    } catch (err) {
+      console.error('Failed to load referral and mentorship analytics', err);
+      setError('Failed to load referral and mentorship analytics. Ensure your admin token is valid and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [targetUserId]);
+
   useEffect(() => {
     if (targetUserId && activeTab === 'connections') {
       void loadConnectionAnalytics();
@@ -197,6 +261,12 @@ const AdminAnalyticsPage: FC = () => {
       void loadEngagementAnalytics();
     }
   }, [targetUserId, activeTab, loadEngagementAnalytics]);
+
+  useEffect(() => {
+    if (targetUserId && activeTab === 'referrals') {
+      void loadReferralMentorshipAnalytics();
+    }
+  }, [targetUserId, activeTab, loadReferralMentorshipAnalytics]);
 
   const connectionMetrics = useMemo(() => {
     if (!growth || !strength || !distribution) {
@@ -248,6 +318,7 @@ const AdminAnalyticsPage: FC = () => {
         <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value as TabType)}>
           <Tab label="Connection Analytics" value="connections" />
           <Tab label="Engagement Analytics" value="engagement" />
+          <Tab label="Referrals & Mentorship" value="referrals" />
         </Tabs>
       </Box>
 
@@ -277,27 +348,36 @@ const AdminAnalyticsPage: FC = () => {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Period"
-            select
-            value={activeTab === 'connections' ? period : engagementPeriod}
-            onChange={(event) => {
-              if (activeTab === 'connections') {
-                setPeriod(event.target.value as ConnectionAnalyticsPeriod);
-              } else {
-                setEngagementPeriod(event.target.value as EngagementAnalyticsPeriod);
-              }
-            }}
-          >
-            {(activeTab === 'connections' ? PERIOD_OPTIONS : ENGAGEMENT_PERIOD_OPTIONS).map(
-              (option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              )
-            )}
-          </TextField>
+          {activeTab === 'referrals' ? (
+            <TextField
+              fullWidth
+              label="Range"
+              value="All Available Data"
+              disabled
+            />
+          ) : (
+            <TextField
+              fullWidth
+              label="Period"
+              select
+              value={activeTab === 'connections' ? period : engagementPeriod}
+              onChange={(event) => {
+                if (activeTab === 'connections') {
+                  setPeriod(event.target.value as ConnectionAnalyticsPeriod);
+                } else {
+                  setEngagementPeriod(event.target.value as EngagementAnalyticsPeriod);
+                }
+              }}
+            >
+              {(activeTab === 'connections' ? PERIOD_OPTIONS : ENGAGEMENT_PERIOD_OPTIONS).map(
+                (option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                )
+              )}
+            </TextField>
+          )}
         </Grid>
       </Grid>
 
@@ -357,6 +437,35 @@ const AdminAnalyticsPage: FC = () => {
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <Typography color="text.secondary">Loading engagement analytics...</Typography>
+          </Box>
+        )
+      ) : null}
+
+      {activeTab === 'referrals' ? (
+        !loading && referralConversion && referralFunnel && mentorshipSummary && mentorshipImpact ? (
+          <Stack spacing={3}>
+            <ReferralMetricsCard conversion={referralConversion} />
+
+            <ApplicationFunnelChart funnelData={referralFunnel} />
+
+            <ReferralSuccessChart
+              conversion={referralConversion}
+              selectedIndustry={selectedIndustry}
+              onIndustryChange={setSelectedIndustry}
+            />
+
+            <MentorshipDashboard
+              summary={mentorshipSummary}
+              impact={mentorshipImpact}
+            />
+          </Stack>
+        ) : loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <Typography color="text.secondary">Loading referral and mentorship analytics...</Typography>
           </Box>
         )
       ) : null}

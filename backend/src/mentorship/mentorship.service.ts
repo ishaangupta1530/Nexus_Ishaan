@@ -4,7 +4,7 @@ import { CreateMentorSettingsDto } from './dto/create-mentor-settings.dto';
 import { UpdateMentorSettingsDto } from './dto/update-mentor-settings.dto';
 import { CreateMentorshipRequestDto } from './dto/create-mentorship-request.dto';
 import { UpdateMentorshipRequestDto } from './dto/update-mentorship-request.dto';
-import { Role } from '@prisma/client';
+import { MeetingStatus, Role } from '@prisma/client';
 import { SearchMentorDto } from './dto/search-mentor.dto';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { NotificationService } from '../notification/notification.service';
@@ -532,5 +532,240 @@ export class MentorshipService {
     });
 
     return agreement;
+  }
+
+  async getMentorshipSummaryAnalytics(
+    targetUserId: string,
+    requesterRole: Role,
+    requesterId: string,
+  ) {
+    if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
+      throw new Error('Unauthorized access');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const mentorshipWhere =
+      user.role === Role.ADMIN
+        ? {}
+        : {
+            OR: [{ mentorId: targetUserId }, { menteeId: targetUserId }],
+          };
+
+    const meetingWhere =
+      user.role === Role.ADMIN
+        ? {}
+        : {
+            mentorship: {
+              OR: [{ mentorId: targetUserId }, { menteeId: targetUserId }],
+            },
+          };
+
+    const [mentorships, meetings, feedback] = await Promise.all([
+      this.prisma.mentorship.findMany({
+        where: mentorshipWhere,
+        select: {
+          id: true,
+          mentorId: true,
+          menteeId: true,
+          progress: true,
+          _count: {
+            select: { goals: true },
+          },
+          goals: {
+            select: { status: true },
+          },
+        },
+      }),
+      this.prisma.meeting.findMany({
+        where: meetingWhere,
+        select: {
+          mentorshipId: true,
+          status: true,
+          startTime: true,
+          endTime: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.feedback.findMany({
+        where: user.role === Role.ADMIN ? {} : { receiverId: targetUserId },
+        select: {
+          rating: true,
+          feedbackFor: true,
+        },
+      }),
+    ]);
+
+    const totalMentorships = mentorships.length;
+    const totalMeetings = meetings.length;
+    const completedMeetings = meetings.filter(
+      (meeting) => meeting.status === MeetingStatus.CONFIRMED,
+    );
+
+    const mentorshipHoursLogged = Math.round(
+      completedMeetings.reduce((sum, meeting) => {
+        const diffMs = meeting.endTime.getTime() - meeting.startTime.getTime();
+        return sum + Math.max(0, diffMs / (1000 * 60 * 60));
+      }, 0) * 100,
+    ) / 100;
+
+    const completionRate =
+      totalMeetings > 0
+        ? Math.round((completedMeetings.length / totalMeetings) * 10000) / 100
+        : 0;
+
+    const mentorFeedback = feedback.filter((f) => f.feedbackFor === 'MENTOR');
+    const menteeFeedback = feedback.filter((f) => f.feedbackFor === 'MENTEE');
+
+    const mentorSatisfactionScore =
+      mentorFeedback.length > 0
+        ? Math.round(
+            (mentorFeedback.reduce((sum, f) => sum + f.rating, 0) /
+              mentorFeedback.length) *
+              100,
+          ) / 100
+        : 0;
+
+    const menteeSatisfactionScore =
+      menteeFeedback.length > 0
+        ? Math.round(
+            (menteeFeedback.reduce((sum, f) => sum + f.rating, 0) /
+              menteeFeedback.length) *
+              100,
+          ) / 100
+        : 0;
+
+    const completedGoals = mentorships.reduce(
+      (sum, mentorship) =>
+        sum + mentorship.goals.filter((goal) => goal.status === 'COMPLETED').length,
+      0,
+    );
+    const totalGoals = mentorships.reduce(
+      (sum, mentorship) => sum + mentorship._count.goals,
+      0,
+    );
+
+    const perspective =
+      user.role === Role.ADMIN
+        ? 'admin'
+        : user.role === Role.ALUM || user.role === Role.MENTOR
+          ? 'mentor'
+          : 'mentee';
+
+    return {
+      userId: targetUserId,
+      perspective,
+      summary: {
+        totalMentorships,
+        totalMeetings,
+        completedMeetings: completedMeetings.length,
+        completionRate,
+        mentorshipHoursLogged,
+        mentorSatisfactionScore,
+        menteeSatisfactionScore,
+        completedGoals,
+        totalGoals,
+      },
+      computedAt: new Date().toISOString(),
+    };
+  }
+
+  async getMentorshipImpactAnalytics(
+    targetUserId: string,
+    requesterRole: Role,
+    requesterId: string,
+  ) {
+    if (requesterRole !== Role.ADMIN && requesterId !== targetUserId) {
+      throw new Error('Unauthorized access');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const mentorshipWhere =
+      user.role === Role.ADMIN
+        ? {}
+        : {
+            OR: [{ mentorId: targetUserId }, { menteeId: targetUserId }],
+          };
+
+    const meetingWhere =
+      user.role === Role.ADMIN
+        ? {}
+        : {
+            mentorship: {
+              OR: [{ mentorId: targetUserId }, { menteeId: targetUserId }],
+            },
+          };
+
+    const [recentMeetings, mentorships] = await Promise.all([
+      this.prisma.meeting.findMany({
+        where: meetingWhere,
+        include: {
+          mentorship: {
+            include: {
+              mentor: { select: { id: true, name: true } },
+              mentee: { select: { id: true, name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      this.prisma.mentorship.findMany({
+        where: mentorshipWhere,
+        include: {
+          goals: true,
+        },
+      }),
+    ]);
+
+    const milestonesAchieved = mentorships
+      .flatMap((mentorship) => mentorship.goals)
+      .filter((goal) => goal.status === 'COMPLETED').length;
+
+    const totalMilestones = mentorships
+      .flatMap((mentorship) => mentorship.goals)
+      .length;
+
+    const impactScore =
+      mentorships.length > 0
+        ? Math.round(
+            mentorships.reduce((sum, mentorship) => sum + mentorship.progress, 0) /
+              mentorships.length,
+          )
+        : 0;
+
+    return {
+      userId: targetUserId,
+      impact: {
+        impactScore,
+        milestonesAchieved,
+        totalMilestones,
+        recentSessions: recentMeetings.map((meeting) => ({
+          id: meeting.id,
+          title: meeting.title,
+          status: meeting.status,
+          startTime: meeting.startTime,
+          endTime: meeting.endTime,
+          mentorName: meeting.mentorship.mentor.name,
+          menteeName: meeting.mentorship.mentee.name,
+        })),
+      },
+      computedAt: new Date().toISOString(),
+    };
   }
 }

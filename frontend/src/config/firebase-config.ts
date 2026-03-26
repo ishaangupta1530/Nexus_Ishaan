@@ -3,7 +3,6 @@ import {
   getMessaging,
   getToken,
   onMessage,
-  Messaging,
 } from 'firebase/messaging';
 
 /**
@@ -35,7 +34,7 @@ const firebaseConfig = {
 const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 
 let app: FirebaseApp | null = null;
-let messaging: Messaging | null = null;
+let messaging: any = null;
 
 /**
  * Initialize Firebase
@@ -61,7 +60,7 @@ export const initializeFirebase = (): FirebaseApp | null => {
 /**
  * Get Firebase Messaging instance
  */
-export const getFirebaseMessaging = (): Messaging | null => {
+export const getFirebaseMessaging = (): any => {
   if (!app) {
     app = initializeFirebase();
     if (!app) return null;
@@ -191,7 +190,7 @@ export const onForegroundMessage = (
     return () => {};
   }
 
-  const unsubscribe = onMessage(messaging, (payload) => {
+  const unsubscribe = onMessage(messaging, (payload: any) => {
     console.log('📨 Foreground message received:', payload);
 
     const title = payload.notification?.title || 'New Message';

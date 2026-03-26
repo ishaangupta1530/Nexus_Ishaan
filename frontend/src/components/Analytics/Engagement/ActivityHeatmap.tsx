@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -9,7 +9,7 @@ import {
   Stack,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { ActivityHeatmapResponse, HeatmapDay } from '../../services/engagementAnalyticsService';
+import { ActivityHeatmapResponse, HeatmapDay } from '../../../services/engagementAnalyticsService';
 
 interface ActivityHeatmapProps {
   data: ActivityHeatmapResponse;
@@ -25,18 +25,11 @@ const INTENSITY_COLORS: Record<number, string> = {
   4: '#196127',
 };
 
-const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
   data,
   onYearChange,
   isLoading = false,
 }) => {
-  const [tooltipContent, setTooltipContent] = useState<{
-    text: string;
-    visible: boolean;
-  }>({ text: '', visible: false });
-
   // Create a map for quick lookup
   const dayMap = useMemo(() => {
     const map: Record<string, HeatmapDay> = {};
@@ -88,26 +81,6 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
 
     return weeks;
   }, [data.year, dayMap]);
-
-  const handleShowTooltip = (day: HeatmapDay | null, event: React.MouseEvent) => {
-    if (!day) {
-      setTooltipContent({ text: '', visible: false });
-      return;
-    }
-
-    const dateObj = new Date(day.date);
-    const formattedDate = dateObj.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-
-    setTooltipContent({
-      text: `${day.count} contribution${day.count !== 1 ? 's' : ''} on ${formattedDate}`,
-      visible: true,
-    });
-  };
 
   if (isLoading) {
     return (
@@ -209,7 +182,6 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
                   arrow
                 >
                   <Box
-                    onMouseEnter={(e) => handleShowTooltip(cell.day, e)}
                     sx={{
                       width: 12,
                       height: 12,
