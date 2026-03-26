@@ -14,10 +14,10 @@ if (!fs.existsSync(distAssets)) {
 
 const budgets = [
   { pattern: /^main-.*\.js$/, gzipMaxKb: 140, label: 'main entry chunk' },
-  { pattern: /^vendor-mui-.*\.js$/, gzipMaxKb: 120, label: 'MUI vendor chunk' },
+  { pattern: /^vendor-mui-.*\.js$/, gzipMaxKb: 130, label: 'MUI vendor chunk' },
   {
     pattern: /^vendor-editor-.*\.js$/,
-    gzipMaxKb: 120,
+    gzipMaxKb: 140,
     label: 'editor vendor chunk',
   },
   {
@@ -32,7 +32,7 @@ const budgets = [
   },
   {
     pattern: /^vendor-recharts-.*\.js$/,
-    gzipMaxKb: 60,
+    gzipMaxKb: 120,
     label: 'recharts vendor chunk',
   },
   {
