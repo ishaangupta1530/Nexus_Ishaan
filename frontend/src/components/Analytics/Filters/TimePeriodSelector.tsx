@@ -28,6 +28,23 @@ const TimePeriodSelector: FC<TimePeriodSelectorProps> = ({
     label={label}
     value={value}
     onChange={(event) => onChange(event.target.value as TimePeriodValue)}
+    SelectProps={{
+      MenuProps: {
+        PaperProps: {
+          sx: {
+            '& .MuiMenuItem-root': { minHeight: 44 },
+          },
+        },
+      },
+    }}
+    sx={{
+      '& .MuiInputBase-root': { minHeight: 44 },
+      '& .MuiOutlinedInput-root.Mui-focused': {
+        outline: '2px solid',
+        outlineColor: 'primary.main',
+        outlineOffset: 2,
+      },
+    }}
   >
     {OPTIONS.map((option) => (
       <MenuItem key={option.value} value={option.value}>

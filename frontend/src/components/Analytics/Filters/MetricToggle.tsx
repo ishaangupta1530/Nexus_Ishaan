@@ -45,6 +45,15 @@ const MetricToggle: FC<MetricToggleProps> = ({ options, onToggle }) => {
         size="small"
         startIcon={<TuneIcon fontSize="small" />}
         onClick={handleOpen}
+        aria-label="Show or hide metric sections"
+        sx={{
+          minHeight: 44,
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: 2,
+          },
+        }}
       >
         Metrics ({enabledCount}/{options.length})
       </Button>
@@ -56,12 +65,13 @@ const MetricToggle: FC<MetricToggleProps> = ({ options, onToggle }) => {
             </Typography>
           </ListItem>
           {options.map((option) => (
-            <ListItem key={option.key} dense>
+            <ListItem key={option.key} dense sx={{ minHeight: 44 }}>
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={option.enabled}
                     onChange={() => onToggle(option.key)}
+                    inputProps={{ 'aria-label': `Toggle ${option.label}` }}
                   />
                 }
                 label={option.label}

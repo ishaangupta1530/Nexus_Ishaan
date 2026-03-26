@@ -31,6 +31,14 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
           disabled={disabled}
           InputLabelProps={{ shrink: true }}
           inputProps={{ max: maxStart }}
+          sx={{
+            '& .MuiInputBase-root': { minHeight: 44 },
+            '& .MuiOutlinedInput-root.Mui-focused': {
+              outline: '2px solid',
+              outlineColor: 'primary.main',
+              outlineOffset: 2,
+            },
+          }}
         />
       </Grid>
       <Grid item xs={12} md={6}>
@@ -43,6 +51,14 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
           disabled={disabled}
           InputLabelProps={{ shrink: true }}
           inputProps={{ min: minEnd }}
+          sx={{
+            '& .MuiInputBase-root': { minHeight: 44 },
+            '& .MuiOutlinedInput-root.Mui-focused': {
+              outline: '2px solid',
+              outlineColor: 'primary.main',
+              outlineOffset: 2,
+            },
+          }}
         />
       </Grid>
     </Grid>

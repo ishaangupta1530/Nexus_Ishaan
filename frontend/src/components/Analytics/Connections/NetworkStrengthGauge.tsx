@@ -20,6 +20,7 @@ const NetworkStrengthGauge: FC<NetworkStrengthGaugeProps> = ({ strength }) => {
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (score / 100) * circumference;
   const color = getGaugeColor(score);
+  const summary = `Network strength score ${score} out of 100. ${strength.interpretation}`;
 
   return (
     <Card>
@@ -35,7 +36,11 @@ const NetworkStrengthGauge: FC<NetworkStrengthGaugeProps> = ({ strength }) => {
           </Tooltip>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}
+          role="img"
+          aria-label={summary}
+        >
           <svg height={radius * 2} width={radius * 2}>
             <circle
               stroke="#e2e8f0"
@@ -83,6 +88,22 @@ const NetworkStrengthGauge: FC<NetworkStrengthGaugeProps> = ({ strength }) => {
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           {strength.interpretation}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            p: 0,
+            m: -1,
+            overflow: 'hidden',
+            clip: 'rect(0 0 0 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {summary}
         </Typography>
       </CardContent>
     </Card>

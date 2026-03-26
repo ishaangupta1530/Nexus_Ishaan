@@ -98,12 +98,21 @@ const ExportButton: FC<ExportButtonProps> = ({ containerRef, fileName }) => {
         size="small"
         startIcon={<FileDownloadIcon fontSize="small" />}
         onClick={handleClick}
+        aria-label="Export current chart as PNG or SVG"
+        sx={{
+          minHeight: 44,
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: 2,
+          },
+        }}
       >
         Export Chart
       </Button>
       <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        <MenuItem onClick={() => { void handleExport('png'); }}>PNG</MenuItem>
-        <MenuItem onClick={() => { void handleExport('svg'); }}>SVG</MenuItem>
+        <MenuItem sx={{ minHeight: 44 }} onClick={() => { void handleExport('png'); }}>PNG</MenuItem>
+        <MenuItem sx={{ minHeight: 44 }} onClick={() => { void handleExport('svg'); }}>SVG</MenuItem>
       </Menu>
     </>
   );

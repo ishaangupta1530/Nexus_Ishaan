@@ -6,12 +6,14 @@ import {
   CircularProgress,
   Container,
   Grid,
+  useMediaQuery,
   MenuItem,
   Stack,
   TextField,
   Typography,
   Tabs,
   Tab,
+  useTheme,
 } from '@mui/material';
 import Divider from '@mui/material/Divider';
 import ShareIcon from '@mui/icons-material/Share';
@@ -112,6 +114,12 @@ const DEFAULT_METRIC_VISIBILITY = Object.values(METRIC_OPTIONS_BY_TAB)
     return acc;
   }, {});
 
+const MOBILE_PRIORITIZED_METRICS: Record<TabType, string[]> = {
+  connections: ['connections.metrics', 'connections.growth'],
+  engagement: ['engagement.summary', 'engagement.timeline'],
+  referrals: ['referrals.metrics', 'referrals.success'],
+};
+
 const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 
 const resolveApiPeriodFromCustomRange = (
@@ -151,6 +159,8 @@ const AdminAnalyticsPage: FC = () => {
   const { user, token } = useAuth();
   const { mode, toggleTheme } = useAppTheme();
   const { toast } = useAppToast();
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Tab state
@@ -270,6 +280,16 @@ const AdminAnalyticsPage: FC = () => {
   const toggleMetricVisibility = useCallback((key: string) => {
     setMetricVisibility((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
+
+  const isMetricEnabled = useCallback(
+    (key: string) => {
+      const desktopEnabled = metricVisibility[key] ?? true;
+      if (!desktopEnabled) return false;
+      if (!isMobile) return true;
+      return MOBILE_PRIORITIZED_METRICS[activeTab].includes(key);
+    },
+    [activeTab, isMobile, metricVisibility],
+  );
 
   const resolvedApiPeriod = useMemo<ConnectionAnalyticsPeriod>(() => {
     if (timePeriod !== 'custom') {
@@ -721,7 +741,17 @@ const AdminAnalyticsPage: FC = () => {
   }, [heatmap, timePeriod, customStartDate, customEndDate]);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container
+      maxWidth="xl"
+      sx={{
+        py: 4,
+        '& .MuiButtonBase-root:focus-visible, & .MuiInputBase-input:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 2,
+        },
+      }}
+    >
       {/* ── Page header ─────────────────────────────── */}
       <Stack spacing={1} sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
@@ -732,6 +762,11 @@ const AdminAnalyticsPage: FC = () => {
             <Typography variant="body1" color="text.secondary">
               Comprehensive analytics for connections, engagement, and performance metrics.
             </Typography>
+            {isMobile ? (
+              <Typography variant="caption" color="text.secondary">
+                Mobile view shows prioritized charts for readability. Rotate device or use desktop for full detail.
+              </Typography>
+            ) : null}
           </Box>
 
           {/* Real-time toolbar */}
@@ -783,7 +818,12 @@ const AdminAnalyticsPage: FC = () => {
 
       {/* Tab navigation */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value as TabType)}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, value) => setActiveTab(value as TabType)}
+          aria-label="Analytics dashboard tabs"
+          sx={{ '& .MuiTab-root': { minHeight: 44 } }}
+        >
           <Tab label="Connection Analytics" value="connections" />
           <Tab label="Engagement Analytics" value="engagement" />
           <Tab label="Referrals & Mentorship" value="referrals" />
@@ -798,10 +838,12 @@ const AdminAnalyticsPage: FC = () => {
               fullWidth
               label="Target User"
               select
+              inputProps={{ 'aria-label': 'Select target user for analytics' }}
               value={selectedUserExists ? targetUserId : ''}
               onChange={(event) => setTargetUserId(event.target.value)}
               helperText="Select a user account to inspect analytics"
               disabled={loadingUsers || userOptions.length === 0}
+              sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               {userOptions.length === 0 ? (
                 <MenuItem value="" disabled>
@@ -825,8 +867,10 @@ const AdminAnalyticsPage: FC = () => {
               fullWidth
               select
               label="Color Scheme"
+              inputProps={{ 'aria-label': 'Select color scheme' }}
               value={themePreference}
               onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
+              sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="light">Light</MenuItem>
               <MenuItem value="dark">Dark</MenuItem>
@@ -852,9 +896,10 @@ const AdminAnalyticsPage: FC = () => {
               select
               size="small"
               label="Connection Chart"
+              inputProps={{ 'aria-label': 'Select connection chart type' }}
               value={connectionChartType}
               onChange={(event) => setConnectionChartType(event.target.value as ConnectionChartType)}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: 180, '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="area">Area</MenuItem>
               <MenuItem value="line">Line</MenuItem>
@@ -866,9 +911,10 @@ const AdminAnalyticsPage: FC = () => {
               select
               size="small"
               label="Referral Chart"
+              inputProps={{ 'aria-label': 'Select referral chart type' }}
               value={referralChartType}
               onChange={(event) => setReferralChartType(event.target.value as ReferralChartType)}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: 180, '& .MuiInputBase-root': { minHeight: 44 } }}
             >
               <MenuItem value="line">Line</MenuItem>
               <MenuItem value="bar">Bar</MenuItem>
@@ -885,6 +931,8 @@ const AdminAnalyticsPage: FC = () => {
             size="small"
             startIcon={<ShareIcon fontSize="small" />}
             onClick={() => { void handleShareLink(); }}
+            aria-label="Share analytics dashboard link"
+            sx={{ minHeight: 44 }}
           >
             Share Link
           </Button>
@@ -903,7 +951,7 @@ const AdminAnalyticsPage: FC = () => {
       {!loading && activeTab === 'connections' && filteredGrowth && distribution && strength ? (
         <Stack spacing={3} ref={chartExportRef}>
           {/* Animated summary row */}
-          {metricVisibility['connections.summary'] ? (
+          {isMetricEnabled('connections.summary') ? (
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', pb: 0.5 }}>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
@@ -941,25 +989,25 @@ const AdminAnalyticsPage: FC = () => {
             </Box>
           ) : null}
 
-          {metricVisibility['connections.metrics'] ? (
+          {isMetricEnabled('connections.metrics') ? (
             <ConnectionMetricsCard metrics={connectionMetrics} />
           ) : null}
 
           <Grid container spacing={3}>
-            {metricVisibility['connections.growth'] ? (
-              <Grid item xs={12} lg={metricVisibility['connections.strength'] ? 8 : 12}>
+            {isMetricEnabled('connections.growth') ? (
+              <Grid item xs={12} lg={isMetricEnabled('connections.strength') ? 8 : 12}>
                 <ConnectionGrowthChart growth={filteredGrowth} chartType={connectionChartType} />
               </Grid>
             ) : null}
 
-            {metricVisibility['connections.strength'] ? (
-              <Grid item xs={12} lg={metricVisibility['connections.growth'] ? 4 : 12}>
+            {isMetricEnabled('connections.strength') ? (
+              <Grid item xs={12} lg={isMetricEnabled('connections.growth') ? 4 : 12}>
                 <NetworkStrengthGauge strength={strength} />
               </Grid>
             ) : null}
           </Grid>
 
-          {metricVisibility['connections.distribution'] ? (
+          {isMetricEnabled('connections.distribution') ? (
             <ConnectionDistributionChart distribution={distribution} />
           ) : null}
         </Stack>
@@ -969,11 +1017,11 @@ const AdminAnalyticsPage: FC = () => {
       {activeTab === 'engagement' ? (
         !loading && filteredEngagementData && filteredHeatmap && contentPerformance ? (
           <Stack spacing={3} ref={chartExportRef}>
-            {metricVisibility['engagement.summary'] ? (
+            {isMetricEnabled('engagement.summary') ? (
               <EngagementMetricsCard data={filteredEngagementData} />
             ) : null}
 
-            {metricVisibility['engagement.heatmap'] ? (
+            {isMetricEnabled('engagement.heatmap') ? (
               <ActivityHeatmap
                 data={filteredHeatmap}
                 onYearChange={setHeatmapYear}
@@ -981,14 +1029,14 @@ const AdminAnalyticsPage: FC = () => {
               />
             ) : null}
 
-            {metricVisibility['engagement.timeline'] ? (
+            {isMetricEnabled('engagement.timeline') ? (
               <EngagementAreaChart
                 data={filteredEngagementData}
                 isLoading={loading}
               />
             ) : null}
 
-            {metricVisibility['engagement.content'] ? (
+            {isMetricEnabled('engagement.content') ? (
               <ContentPerformanceChart
                 data={contentPerformance}
                 onPageChange={setContentPerfPage}
@@ -1010,15 +1058,15 @@ const AdminAnalyticsPage: FC = () => {
       {activeTab === 'referrals' ? (
         !loading && referralConversion && referralFunnel && mentorshipSummary && mentorshipImpact ? (
           <Stack spacing={3} ref={chartExportRef}>
-            {metricVisibility['referrals.metrics'] ? (
+            {isMetricEnabled('referrals.metrics') ? (
               <ReferralMetricsCard conversion={referralConversion} />
             ) : null}
 
-            {metricVisibility['referrals.funnel'] ? (
+            {isMetricEnabled('referrals.funnel') ? (
               <ApplicationFunnelChart funnelData={referralFunnel} />
             ) : null}
 
-            {metricVisibility['referrals.success'] ? (
+            {isMetricEnabled('referrals.success') ? (
               <ReferralSuccessChart
                 conversion={referralConversion}
                 selectedIndustry={selectedIndustry}
@@ -1027,7 +1075,7 @@ const AdminAnalyticsPage: FC = () => {
               />
             ) : null}
 
-            {metricVisibility['referrals.mentorship'] ? (
+            {isMetricEnabled('referrals.mentorship') ? (
               <MentorshipDashboard
                 summary={mentorshipSummary}
                 impact={mentorshipImpact}

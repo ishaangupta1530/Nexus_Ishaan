@@ -108,6 +108,7 @@ const EngagementAreaChart: React.FC<EngagementAreaChartProps> = ({
   const totalPosts = data.timeline.reduce((sum, p) => sum + p.posts, 0);
   const totalComments = data.timeline.reduce((sum, p) => sum + p.comments, 0);
   const totalVotes = data.timeline.reduce((sum, p) => sum + p.votes, 0);
+  const summary = `Engagement timeline with ${chartData.length} points. Total posts ${totalPosts}, comments ${totalComments}, votes ${totalVotes}.`;
 
   return (
     <Paper sx={{ p: 3, mb: 3 }}>
@@ -122,6 +123,8 @@ const EngagementAreaChart: React.FC<EngagementAreaChartProps> = ({
             variant="outlined"
             onClick={handleExportData}
             startIcon={<DownloadIcon fontSize="small" />}
+            aria-label="Export engagement timeline data as CSV"
+            sx={{ minHeight: 44 }}
           >
             Export Data
           </Button>
@@ -202,7 +205,12 @@ const EngagementAreaChart: React.FC<EngagementAreaChartProps> = ({
         </Box>
 
         {/* Chart */}
-        <Box id="engagement-area-chart" sx={{ width: '100%', height: 300 }}>
+        <Box
+          id="engagement-area-chart"
+          role="img"
+          aria-label={summary}
+          sx={{ width: '100%', height: 300 }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={chartData}
@@ -275,6 +283,23 @@ const EngagementAreaChart: React.FC<EngagementAreaChartProps> = ({
             </AreaChart>
           </ResponsiveContainer>
         </Box>
+
+        <Typography
+          variant="caption"
+          sx={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            p: 0,
+            m: -1,
+            overflow: 'hidden',
+            clip: 'rect(0 0 0 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {summary}
+        </Typography>
       </Stack>
     </Paper>
   );

@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
 import {
   Area,
   AreaChart,
@@ -23,6 +23,8 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
   growth,
   chartType = 'area',
 }) => {
+  const summary = `Connection growth chart showing ${growth.data.length} points. Total connections ${growth.metrics.totalConnections}, growth rate ${growth.metrics.growthRate} percent, velocity ${growth.metrics.velocity} per bucket.`;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -56,6 +58,11 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
           </Stack>
 
           <ResponsiveContainer width="100%" height={320}>
+            <Box
+              role="img"
+              aria-label={summary}
+              sx={{ width: '100%', height: '100%' }}
+            >
             {chartType === 'line' ? (
               <LineChart data={growth.data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -117,7 +124,24 @@ const ConnectionGrowthChart: FC<ConnectionGrowthChartProps> = ({
                 />
               </AreaChart>
             )}
+            </Box>
           </ResponsiveContainer>
+          <Typography
+            variant="caption"
+            sx={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              p: 0,
+              m: -1,
+              overflow: 'hidden',
+              clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {summary}
+          </Typography>
         </CardContent>
       </Card>
     </motion.div>

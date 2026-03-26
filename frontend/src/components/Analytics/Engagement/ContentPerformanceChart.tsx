@@ -73,6 +73,7 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
   );
   const avgPerformance =
     data.items.length > 0 ? totalPerformance / data.items.length : 0;
+  const chartSummary = `Content performance chart showing ${data.items.length} posts on this page with average score ${avgPerformance.toFixed(1)} and total posts ${data.pagination.total}.`;
 
   return (
     <Paper sx={{ p: 3, mb: 3 }}>
@@ -114,7 +115,7 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
 
         {/* Chart */}
         {data.items.length > 0 ? (
-          <Box sx={{ width: '100%', height: 400 }}>
+          <Box sx={{ width: '100%', height: 400 }} role="img" aria-label={chartSummary}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"
@@ -170,6 +171,8 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
               {data.items.map((post, idx) => (
                 <Box
                   key={post.id}
+                  tabIndex={0}
+                  aria-label={`${post.subject}, score ${post.performanceScore.toFixed(1)}, ${post.votes} votes, ${post.comments} comments`}
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
@@ -187,6 +190,8 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
                   }}
                   onMouseEnter={() => setHoveredIndex(idx)}
                   onMouseLeave={() => setHoveredIndex(null)}
+                  onFocus={() => setHoveredIndex(idx)}
+                  onBlur={() => setHoveredIndex(null)}
                 >
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
@@ -246,9 +251,28 @@ const ContentPerformanceChart: React.FC<ContentPerformanceChartProps> = ({
               page={data.pagination.page}
               onChange={handlePageChange}
               color="primary"
+              aria-label="Content performance page navigation"
+              sx={{ '& .MuiPaginationItem-root': { minWidth: 44, minHeight: 44 } }}
             />
           </Box>
         )}
+
+        <Typography
+          variant="caption"
+          sx={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            p: 0,
+            m: -1,
+            overflow: 'hidden',
+            clip: 'rect(0 0 0 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {chartSummary}
+        </Typography>
       </Stack>
     </Paper>
   );

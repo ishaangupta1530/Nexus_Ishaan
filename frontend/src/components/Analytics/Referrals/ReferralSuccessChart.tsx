@@ -58,6 +58,8 @@ const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
     }));
   }, [conversion.successByIndustry, selectedIndustry]);
 
+  const summary = `Referral success chart for ${selectedIndustry === 'ALL' ? 'all industries' : selectedIndustry}. ${lineData.length} categories displayed.`;
+
   const exportData = () => {
     const header = ['industry', 'posted', 'successful', 'successRate'];
     const csv = [
@@ -97,7 +99,8 @@ const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
                 select
                 value={selectedIndustry}
                 onChange={(event) => onIndustryChange(event.target.value)}
-                sx={{ minWidth: 200 }}
+                sx={{ minWidth: 200, '& .MuiInputBase-root': { minHeight: 44 } }}
+                inputProps={{ 'aria-label': 'Select industry for referral success chart' }}
               >
                 <MenuItem value="ALL">All Industries</MenuItem>
                 {industries.map((industry) => (
@@ -111,13 +114,15 @@ const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
                 variant="outlined"
                 startIcon={<DownloadIcon fontSize="small" />}
                 onClick={exportData}
+                aria-label="Export referral success data as CSV"
+                sx={{ minHeight: 44 }}
               >
                 Export Data
               </Button>
             </Stack>
           </Stack>
 
-          <Box sx={{ height: 340 }}>
+          <Box sx={{ height: 340 }} role="img" aria-label={summary}>
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'bar' ? (
                 <BarChart data={lineData}>
@@ -154,6 +159,23 @@ const ReferralSuccessChart: FC<ReferralSuccessChartProps> = ({
               )}
             </ResponsiveContainer>
           </Box>
+
+          <Typography
+            variant="caption"
+            sx={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              p: 0,
+              m: -1,
+              overflow: 'hidden',
+              clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {summary}
+          </Typography>
         </Stack>
       </CardContent>
     </Card>

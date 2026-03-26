@@ -1,5 +1,6 @@
 import { FC, useMemo, useState } from 'react';
 import {
+  Box,
   Card,
   CardContent,
   Stack,
@@ -55,6 +56,8 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
       fill: colors[index % colors.length],
     }));
 
+  const summary = `Connection distribution ${activeView} chart with ${visibleData.length} visible categories and ${distribution.totalConnections} total connections.`;
+
   return (
     <Card>
       <CardContent>
@@ -77,6 +80,8 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
               setActiveView(value);
               setHiddenLabels(new Set());
             }}
+            aria-label="Connection distribution grouping"
+            sx={{ '& .MuiToggleButton-root': { minHeight: 44 } }}
           >
             <ToggleButton value="role">Role</ToggleButton>
             <ToggleButton value="year">Year</ToggleButton>
@@ -85,6 +90,7 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
         </Stack>
 
         <ResponsiveContainer width="100%" height={300}>
+          <Box role="img" aria-label={summary} sx={{ width: '100%', height: '100%' }}>
           <PieChart>
             <Pie
               data={visibleData}
@@ -99,6 +105,7 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
             />
             <Tooltip />
           </PieChart>
+          </Box>
         </ResponsiveContainer>
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -110,10 +117,17 @@ const ConnectionDistributionChart: FC<ConnectionDistributionChartProps> = ({
                 value={item.label}
                 selected={!isHidden}
                 size="small"
+                aria-label={`Toggle ${item.label} visibility`}
                 sx={{
                   textTransform: 'none',
+                  minHeight: 44,
                   borderColor: colors[index % colors.length],
                   color: colors[index % colors.length],
+                  '&:focus-visible': {
+                    outline: '2px solid',
+                    outlineColor: 'primary.main',
+                    outlineOffset: 2,
+                  },
                 }}
                 onClick={() => {
                   setHiddenLabels((prev) => {

@@ -18,6 +18,8 @@ const ApplicationFunnelChart: FC<ApplicationFunnelChartProps> = ({ funnelData })
     [funnelData],
   );
 
+  const summary = `Application funnel with ${chartData.length} stages. First stage ${chartData[0]?.name || 'N/A'} has ${chartData[0]?.value || 0} records.`;
+
   return (
     <Card>
       <CardContent>
@@ -26,7 +28,7 @@ const ApplicationFunnelChart: FC<ApplicationFunnelChartProps> = ({ funnelData })
             Application Funnel
           </Typography>
 
-          <Box sx={{ height: 340 }}>
+          <Box sx={{ height: 340 }} role="img" aria-label={summary}>
             <ResponsiveContainer width="100%" height="100%">
               <FunnelChart>
                 <Tooltip />
@@ -36,6 +38,23 @@ const ApplicationFunnelChart: FC<ApplicationFunnelChartProps> = ({ funnelData })
               </FunnelChart>
             </ResponsiveContainer>
           </Box>
+
+          <Typography
+            variant="caption"
+            sx={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              p: 0,
+              m: -1,
+              overflow: 'hidden',
+              clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {summary}
+          </Typography>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             {chartData.map((stage) => (

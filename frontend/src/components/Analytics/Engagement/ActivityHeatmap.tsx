@@ -30,6 +30,8 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
   onYearChange,
   isLoading = false,
 }) => {
+  const summary = `Activity heatmap for ${data.year}. ${data.totalContributions} contributions across ${data.totalActiveDays} active days, max daily count ${data.maxDailyCount}.`;
+
   // Create a map for quick lookup
   const dayMap = useMemo(() => {
     const map: Record<string, HeatmapDay> = {};
@@ -111,6 +113,8 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
               variant="outlined"
               onClick={() => onYearChange(data.year - 1)}
               startIcon={<ChevronLeft size={18} />}
+              aria-label={`Show activity heatmap for ${data.year - 1}`}
+              sx={{ minHeight: 44 }}
             >
               Previous
             </Button>
@@ -119,6 +123,8 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
               variant="outlined"
               onClick={() => onYearChange(data.year + 1)}
               endIcon={<ChevronRight size={18} />}
+              aria-label={`Show activity heatmap for ${data.year + 1}`}
+              sx={{ minHeight: 44 }}
             >
               Next
             </Button>
@@ -161,6 +167,8 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
             overflow: 'auto',
             pb: 1,
           }}
+          role="img"
+          aria-label={summary}
         >
           {calendarWeeks.map((week, weekIdx) => (
             <Box
@@ -182,6 +190,12 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
                   arrow
                 >
                   <Box
+                    tabIndex={cell.day !== null ? 0 : -1}
+                    aria-label={
+                      cell.day && cell.date
+                        ? `${cell.date}: ${cell.day.count} contributions`
+                        : 'No data'
+                    }
                     sx={{
                       width: 12,
                       height: 12,
@@ -201,6 +215,10 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
                             ? '0 2px 8px rgba(0,0,0,0.15)'
                             : 'none',
                       },
+                      '&:focus-visible': {
+                        outline: cell.day !== null ? '2px solid #0f172a' : 'none',
+                        outlineOffset: 2,
+                      },
                     }}
                   />
                 </Tooltip>
@@ -208,6 +226,23 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
             </Box>
           ))}
         </Box>
+
+        <Typography
+          variant="caption"
+          sx={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            p: 0,
+            m: -1,
+            overflow: 'hidden',
+            clip: 'rect(0 0 0 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {summary}
+        </Typography>
 
         {/* Legend */}
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
