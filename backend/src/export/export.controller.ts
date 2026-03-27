@@ -11,10 +11,12 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConnectionStatus, Role } from '@prisma/client';
 import { IsEnum, IsOptional, IsObject } from 'class-validator';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
+import { PrismaService } from '../prisma/prisma.service';
 import { CsvGenerator } from './generators/csv.generator';
 import { JsonGenerator } from './generators/json.generator';
 import { ExcelGenerator } from './generators/excel.generator';
@@ -50,6 +52,7 @@ export class ExportController {
   private readonly jobs = new Map<string, ExportJob>();
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly csvGenerator: CsvGenerator,
     private readonly jsonGenerator: JsonGenerator,
     private readonly excelGenerator: ExcelGenerator,
@@ -60,11 +63,16 @@ export class ExportController {
   @HttpCode(HttpStatus.OK)
   async exportData(
     @Body() dto: ExportRequestDto,
-    @GetCurrentUser('userId') userId: string,
+    @GetCurrentUser() currentUser: { sub?: string; userId?: string },
   ) {
     try {
       if (!dto.type || !dto.format) {
         throw new BadRequestException('Missing required fields: type and format');
+      }
+
+      const userId = currentUser?.sub || currentUser?.userId;
+      if (!userId) {
+        throw new BadRequestException('Unable to resolve current user ID');
       }
 
       // Generate job ID
@@ -88,7 +96,7 @@ export class ExportController {
         try {
           job.progress = 25;
 
-          const mockData = this._getMockDataForType(dto.type);
+          const exportData = await this._getDataForType(dto.type, userId, dto.filters);
           job.progress = 50;
 
           const formatLower = dto.format.toLowerCase();
@@ -96,22 +104,22 @@ export class ExportController {
 
           switch (formatLower) {
             case 'csv':
-              buffer = this.csvGenerator.generate(mockData);
+              buffer = this.csvGenerator.generate(exportData);
               break;
 
             case 'json':
-              buffer = this.jsonGenerator.generate(mockData, job.filename, userId);
+              buffer = this.jsonGenerator.generate(exportData, job.filename, userId);
               break;
 
             case 'excel':
-              buffer = this.excelGenerator.generate(mockData);
+              buffer = this.excelGenerator.generate(exportData);
               break;
 
             case 'pdf': {
               const pdfContent = [
                 {
                   heading: `${dto.type} Export`,
-                  content: mockData,
+                  content: exportData,
                 },
               ];
               buffer = await this.pdfGenerator.generate(
@@ -235,86 +243,172 @@ export class ExportController {
     return extensionMap[format] || format.toLowerCase();
   }
 
-  private _getMockDataForType(type: string): any[] {
-    switch (type) {
-      case 'ANALYTICS':
-        return [
-          {
-            metric: 'Profile Views',
-            value: 1250,
-            date: '2026-03-18',
-            change: '+5.2%',
-          },
-          {
-            metric: 'Engagement Rate',
-            value: '42%',
-            date: '2026-03-18',
-            change: '+2.1%',
-          },
-          {
-            metric: 'Connections',
-            value: 328,
-            date: '2026-03-18',
-            change: '+12',
-          },
-        ];
+  private async _getDataForType(
+    type: string,
+    userId: string,
+    filters?: Record<string, unknown>,
+  ): Promise<any[]> {
+    const normalizedType = type.toUpperCase();
 
+    switch (normalizedType) {
       case 'REFERRALS':
-        return [
-          {
-            id: '1',
-            name: 'John Doe',
-            email: 'john@example.com',
-            status: 'Completed',
-            reward: '$50',
-            date: '2026-03-10',
-          },
-          {
-            id: '2',
-            name: 'Jane Smith',
-            email: 'jane@example.com',
-            status: 'Pending',
-            reward: '$50',
-            date: '2026-03-15',
-          },
-        ];
-
+        return this._getReferralExportData(userId, filters);
       case 'CONNECTIONS':
-        return [
-          {
-            id: '1',
-            name: 'Alice Johnson',
-            email: 'alice@example.com',
-            role: 'Student',
-            connectedDate: '2026-01-15',
-            lastActive: '2026-03-17',
-          },
-          {
-            id: '2',
-            name: 'Bob Williams',
-            email: 'bob@example.com',
-            role: 'Alumni',
-            connectedDate: '2026-02-20',
-            lastActive: '2026-03-18',
-          },
-        ];
-
-      case 'CUSTOM':
+        return this._getConnectionExportData(userId, filters);
       default:
-        return [
-          {
-            id: '1',
-            name: 'Sample Entry 1',
-            value: 100,
-            status: 'Active',
-          },
-          {
-            id: '2',
-            name: 'Sample Entry 2',
-            value: 200,
-            status: 'Inactive',
-          },
-        ];
+        return [];
     }
   }
+
+  private async _getReferralExportData(
+    userId: string,
+    filters?: Record<string, unknown>,
+  ): Promise<any[]> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isAdmin = user?.role === Role.ADMIN;
+    const statusFilter = typeof filters?.status === 'string' ? filters.status : undefined;
+
+    const createdAtFilter: { gte?: Date; lte?: Date } = {};
+    const dateRangeRaw = filters?.dateRange as { start?: string; end?: string } | undefined;
+    if (dateRangeRaw?.start) {
+      createdAtFilter.gte = new Date(dateRangeRaw.start);
+    }
+    if (dateRangeRaw?.end) {
+      createdAtFilter.lte = new Date(dateRangeRaw.end);
+    }
+
+    const andConditions: Record<string, unknown>[] = [];
+
+    if (!isAdmin) {
+      andConditions.push({
+        OR: [{ status: 'APPROVED' }, { alumniId: userId }],
+      });
+    }
+
+    if (statusFilter) {
+      andConditions.push({ status: statusFilter });
+    }
+
+    if (Object.keys(createdAtFilter).length > 0) {
+      andConditions.push({ createdAt: createdAtFilter });
+    }
+
+    const where = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    const referrals = await this.prisma.referral.findMany({
+      where,
+      select: {
+        id: true,
+        company: true,
+        jobTitle: true,
+        location: true,
+        status: true,
+        createdAt: true,
+        deadline: true,
+        postedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    });
+
+    return referrals.map((referral) => ({
+      id: referral.id,
+      company: referral.company,
+      jobTitle: referral.jobTitle,
+      location: referral.location,
+      status: referral.status,
+      createdAt: referral.createdAt,
+      deadline: referral.deadline,
+      postedByName: referral.postedBy.name,
+      postedByEmail: referral.postedBy.email,
+      applicationsCount: referral._count.applications,
+    }));
+  }
+
+  private async _getConnectionExportData(
+    userId: string,
+    filters?: Record<string, unknown>,
+  ): Promise<any[]> {
+    const rawStatus =
+      typeof filters?.status === 'string' && filters.status.trim().length > 0
+        ? filters.status.toUpperCase()
+        : ConnectionStatus.ACCEPTED;
+
+    const statusFilter = (Object.values(ConnectionStatus) as string[]).includes(rawStatus)
+      ? (rawStatus as ConnectionStatus)
+      : ConnectionStatus.ACCEPTED;
+
+    const connections = await this.prisma.connection.findMany({
+      where: {
+        OR: [{ requesterId: userId }, { recipientId: userId }],
+        status: statusFilter,
+      },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        requesterId: true,
+        requester: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            profile: {
+              select: {
+                location: true,
+              },
+            },
+          },
+        },
+        recipient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            profile: {
+              select: {
+                location: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    });
+
+    return connections.map((connection) => {
+      const otherUser =
+        connection.requesterId === userId ? connection.recipient : connection.requester;
+
+      return {
+        id: connection.id,
+        connectedAt: connection.createdAt,
+        status: connection.status,
+        userId: otherUser.id,
+        name: otherUser.name,
+        email: otherUser.email,
+        role: otherUser.role,
+        location: otherUser.profile?.location || '',
+      };
+    });
+  }
+
 }
