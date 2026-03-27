@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import PDFDocument = require('pdfkit');
+import * as PDFDocument from 'pdfkit';
 
 interface PdfContent {
   heading: string;
