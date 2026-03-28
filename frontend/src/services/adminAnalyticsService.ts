@@ -130,6 +130,38 @@ export interface ModerationQueueResponse {
   generatedAt: string;
 }
 
+export type TrendingPeriod = 'hour' | 'day' | 'week';
+
+export interface TrendingPostItem {
+  postId: string;
+  rank: number;
+  score: number;
+  subject: string;
+  contentPreview: string;
+  createdAt: string;
+  upvotes: number;
+  comments: number;
+  creator: {
+    id: string;
+    name: string;
+    role: string;
+  };
+}
+
+export interface TrendingPostsResponse {
+  period: 'HOUR' | 'DAY' | 'WEEK';
+  calculatedAt: string;
+  posts: TrendingPostItem[];
+  source: 'redis' | 'database' | 'warming';
+}
+
+export interface TrendingScoreResponse {
+  postId: string;
+  period: 'HOUR' | 'DAY' | 'WEEK';
+  score: number;
+  rank: number | null;
+}
+
 const adminAnalyticsService = {
   getPlatformStats: (params: AdminAnalyticsQuery) =>
     api.get<PlatformStatsResponse>('/analytics/admin/platform-stats', {
@@ -146,6 +178,18 @@ const adminAnalyticsService = {
     api.get<ModerationQueueResponse>('/analytics/admin/moderation-queue', {
       params,
     }),
+
+  getTrendingPosts: (period: TrendingPeriod = 'day', limit = 20) =>
+    api.get<TrendingPostsResponse>('/trending/posts', {
+      params: { period, limit },
+    }),
+
+  getTrendingPostScore: (postId: string, period: TrendingPeriod = 'day') =>
+    api.get<TrendingScoreResponse>(`/trending/posts/${postId}/score`, {
+      params: { period },
+    }),
+
+  recalculateTrending: () => api.post('/trending/recalculate'),
 };
 
 export default adminAnalyticsService;

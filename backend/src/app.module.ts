@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -31,6 +32,7 @@ import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ExportModule } from './export/export.module';
+import { TrendingModule } from './trending/trending.module';
 import { QueueModule } from './queue/queue.module';
 import { securityConfig } from './common/config/security.config';
 import { envValidationSchema } from './common/config/env.validation';
@@ -58,6 +60,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
         abortEarly: false,
       },
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: securityConfig.rateLimit.ttl, // seconds as configured in security.config
@@ -91,6 +94,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
     HealthModule,
     MetricsModule,
     ExportModule,
+    TrendingModule,
     QueueModule,
   ],
   controllers: [AppController, FrontendErrorController],

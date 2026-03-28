@@ -149,12 +149,16 @@ export class UnifiedWebSocketGateway
     // Skip Redis initialization if explicitly disabled
     if (disableRedis === 'true') {
       this.logger.warn('⚠️ Redis disabled - WebSocket will operate in single-server mode');
+      this.redis = this.createMockRedisClient();
+      this.redisSub = this.createMockRedisClient();
       return;
     }
 
     // Skip Redis initialization if not configured
     if (!redisUrl || redisUrl.trim() === '') {
       this.logger.warn('⚠️ Redis not configured - WebSocket will operate in single-server mode');
+      this.redis = this.createMockRedisClient();
+      this.redisSub = this.createMockRedisClient();
       return;
     }
 

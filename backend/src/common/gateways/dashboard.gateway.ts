@@ -46,8 +46,8 @@ export class DashboardGateway
   server: Server;
 
   // Track connected users
-  private connectedUsers = new Map<string, Set<string>>(); // userId -> Set of socketIds
-  private socketToUser = new Map<string, string>(); // socketId -> userId
+  private readonly connectedUsers = new Map<string, Set<string>>(); // userId -> Set of socketIds
+  private readonly socketToUser = new Map<string, string>(); // socketId -> userId
 
   constructor(private readonly jwtService: JwtService) {}
 
@@ -66,7 +66,17 @@ export class DashboardGateway
     try {
       this.logger.log(`🔌 Dashboard connection attempt: socketId=${client.id}`);
 
-      const { userId, token } = client.handshake.query;
+      const queryUserId = client.handshake.query?.userId;
+      const queryToken = client.handshake.query?.token;
+      const authPayload = (client.handshake.auth ?? {}) as {
+        userId?: string;
+        token?: string;
+      };
+
+      const userId =
+        (typeof queryUserId === 'string' && queryUserId) || authPayload.userId;
+      const token =
+        (typeof queryToken === 'string' && queryToken) || authPayload.token;
 
       if (!userId || !token) {
         this.logger.log('❌ Missing userId or token');
@@ -80,8 +90,8 @@ export class DashboardGateway
 
       // Verify JWT token
       try {
-        const payload = this.jwtService.verify(token as string);
-        client.userId = payload.userId || userId;
+        const payload = this.jwtService.verify(token);
+        client.userId = payload.userId || payload.sub || userId;
         client.userEmail = payload.email;
       } catch (jwtError) {
         this.logger.log(`❌ Invalid JWT token: ${jwtError.message}`);
@@ -93,13 +103,20 @@ export class DashboardGateway
         return;
       }
 
-      const userIdStr = client.userId as string;
+      const userIdStr = client.userId;
+      if (!userIdStr) {
+        this.logger.log('❌ Unable to resolve userId from token');
+        client.disconnect();
+        return;
+      }
 
       // Track connection
-      if (!this.connectedUsers.has(userIdStr)) {
-        this.connectedUsers.set(userIdStr, new Set());
+      let userSockets = this.connectedUsers.get(userIdStr);
+      if (!userSockets) {
+        userSockets = new Set<string>();
+        this.connectedUsers.set(userIdStr, userSockets);
       }
-      this.connectedUsers.get(userIdStr)!.add(client.id);
+      userSockets.add(client.id);
       this.socketToUser.set(client.id, userIdStr);
 
       // Join user-specific room

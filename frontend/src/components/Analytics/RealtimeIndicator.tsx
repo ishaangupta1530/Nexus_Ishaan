@@ -41,6 +41,7 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
     setStatus('connecting');
 
     const socket = io(`${BACKEND_URL}/dashboard`, {
+      query: { userId, token },
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: false,
@@ -54,6 +55,10 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
     socket.on('connect', () => {
       if (unmountedRef.current) return;
       attemptsRef.current = 0;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       setStatus('connected');
       socket.emit('subscribe', { channels: ['analytics'], userId });
     });
@@ -64,10 +69,15 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
         setStatus('disconnected');
         return;
       }
+      if (reconnectTimerRef.current) return;
+
       attemptsRef.current += 1;
       setStatus('reconnecting');
       const delay = Math.min(1_000 * attemptsRef.current, 10_000);
       reconnectTimerRef.current = setTimeout(() => {
+        // Avoid stacking timers when both disconnect and connect_error fire.
+        reconnectTimerRef.current = null;
+        socketRef.current?.removeAllListeners();
         socketRef.current?.disconnect();
         connect();
       }, delay);
@@ -97,6 +107,8 @@ const RealtimeIndicator: FC<Props> = ({ userId, token, onAnalyticsUpdate }) => {
     return () => {
       unmountedRef.current = true;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      socketRef.current?.removeAllListeners();
       socketRef.current?.disconnect();
       socketRef.current = null;
     };

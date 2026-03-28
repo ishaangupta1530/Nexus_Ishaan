@@ -181,6 +181,20 @@ model DashboardConfig {
   @@map("dashboard_configs")
 }
 
+model TrendingCache {
+  id           String   @id @default(cuid())
+  contentType  String
+  contentId    String
+  score        Float
+  rank         Int
+  period       String
+  calculatedAt DateTime @default(now())
+
+  @@unique([contentType, contentId, period])
+  @@index([contentType, period, score])
+  @@map("trending_cache")
+}
+
 model News {
   id          String    @id @default(cuid())
   title       String

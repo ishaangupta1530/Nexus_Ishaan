@@ -47,6 +47,8 @@ import adminAnalyticsService, {
   type UserGrowthResponse,
   type ContentStatsResponse,
   type ModerationQueueResponse,
+  type TrendingPostsResponse,
+  type TrendingPeriod,
 } from '@/services/adminAnalyticsService';
 import ConnectionGrowthChart from '@/components/Analytics/Connections/ConnectionGrowthChart';
 import ConnectionDistributionChart from '@/components/Analytics/Connections/ConnectionDistributionChart';
@@ -80,7 +82,12 @@ type AdminUserOption = {
   role: string;
 };
 
-type TabType = 'connections' | 'engagement' | 'referrals' | 'platform';
+type TabType =
+  | 'connections'
+  | 'engagement'
+  | 'referrals'
+  | 'platform'
+  | 'trending';
 type ThemePreference = 'light' | 'dark' | 'auto';
 type ConnectionChartType = 'area' | 'line';
 type ReferralChartType = 'line' | 'bar';
@@ -121,6 +128,10 @@ const METRIC_OPTIONS_BY_TAB: Record<
     { key: 'platform.content', label: 'Content Statistics' },
     { key: 'platform.moderation', label: 'Moderation Queue' },
   ],
+  trending: [
+    { key: 'trending.summary', label: 'Trending Summary' },
+    { key: 'trending.list', label: 'Trending Leaderboard' },
+  ],
 };
 
 const DEFAULT_METRIC_VISIBILITY = Object.values(METRIC_OPTIONS_BY_TAB)
@@ -135,6 +146,7 @@ const MOBILE_PRIORITIZED_METRICS: Record<TabType, string[]> = {
   engagement: ['engagement.summary', 'engagement.timeline'],
   referrals: ['referrals.metrics', 'referrals.success'],
   platform: ['platform.overview', 'platform.moderation'],
+  trending: ['trending.summary', 'trending.list'],
 };
 
 const resolveDaysFromTimePeriod = (period: TimePeriodValue): number => {
@@ -281,6 +293,14 @@ const AdminAnalyticsPage: FC = () => {
   const [moderationQueue, setModerationQueue] =
     useState<ModerationQueueResponse | null>(null);
 
+  // Trending analytics state
+  const [trendingPeriod, setTrendingPeriod] = useState<TrendingPeriod>(
+    (searchParams.get('trendPeriod') as TrendingPeriod) || 'day'
+  );
+  const [trendingData, setTrendingData] =
+    useState<TrendingPostsResponse | null>(null);
+  const [recalculatingTrending, setRecalculatingTrending] = useState(false);
+
   // General state
   const [userOptions, setUserOptions] = useState<AdminUserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -389,6 +409,7 @@ const AdminAnalyticsPage: FC = () => {
         connectionChartType?: ConnectionChartType;
         referralChartType?: ReferralChartType;
         themePreference?: ThemePreference;
+        trendingPeriod?: TrendingPeriod;
       };
 
       if (!searchParams.get('period') && parsed.timePeriod)
@@ -413,6 +434,8 @@ const AdminAnalyticsPage: FC = () => {
         setReferralChartType(parsed.referralChartType);
       if (!searchParams.get('theme') && parsed.themePreference)
         setThemePreference(parsed.themePreference);
+      if (!searchParams.get('trendPeriod') && parsed.trendingPeriod)
+        setTrendingPeriod(parsed.trendingPeriod);
     } catch (err) {
       console.error('Failed to parse analytics filter preferences', err);
     }
@@ -433,6 +456,7 @@ const AdminAnalyticsPage: FC = () => {
         connectionChartType,
         referralChartType,
         themePreference,
+        trendingPeriod,
       })
     );
   }, [
@@ -445,6 +469,7 @@ const AdminAnalyticsPage: FC = () => {
     connectionChartType,
     referralChartType,
     themePreference,
+    trendingPeriod,
   ]);
 
   useEffect(() => {
@@ -464,6 +489,7 @@ const AdminAnalyticsPage: FC = () => {
         connChart: connectionChartType,
         refChart: referralChartType,
         theme: themePreference,
+        trendPeriod: trendingPeriod,
         industry: selectedIndustry,
         metrics: enabledMetricKeys,
       },
@@ -480,6 +506,7 @@ const AdminAnalyticsPage: FC = () => {
     connectionChartType,
     referralChartType,
     themePreference,
+    trendingPeriod,
     selectedIndustry,
     metricVisibility,
   ]);
@@ -513,6 +540,7 @@ const AdminAnalyticsPage: FC = () => {
       connChart: connectionChartType,
       refChart: referralChartType,
       theme: themePreference,
+      trendPeriod: trendingPeriod,
       industry: selectedIndustry,
       metrics: enabledMetricKeys,
     });
@@ -564,6 +592,7 @@ const AdminAnalyticsPage: FC = () => {
     selectedIndustry,
     targetUserId,
     themePreference,
+    trendingPeriod,
     timePeriod,
     toast,
   ]);
@@ -749,6 +778,30 @@ const AdminAnalyticsPage: FC = () => {
     [adminAnalyticsParams]
   );
 
+  const loadTrendingAnalytics = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminAnalyticsService.getTrendingPosts(
+          trendingPeriod,
+          20
+        );
+        setTrendingData(response.data);
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load trending analytics', err);
+        setError(
+          'Failed to load trending analytics. Ensure your admin token is valid and try again.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [trendingPeriod]
+  );
+
   useEffect(() => {
     if (targetUserId && activeTab === 'connections') {
       void loadConnectionAnalytics();
@@ -773,14 +826,22 @@ const AdminAnalyticsPage: FC = () => {
     }
   }, [activeTab, loadPlatformAnalytics]);
 
+  useEffect(() => {
+    if (activeTab === 'trending') {
+      void loadTrendingAnalytics();
+    }
+  }, [activeTab, loadTrendingAnalytics]);
+
   // Silent (non-blocking) refresh for auto-refresh and WS-triggered updates
   const silentRefreshCurrentTab = useCallback(async () => {
-    if (activeTab !== 'platform' && !targetUserId) return;
+    if (activeTab !== 'platform' && activeTab !== 'trending' && !targetUserId)
+      return;
     if (activeTab === 'connections') await loadConnectionAnalytics(true);
     else if (activeTab === 'engagement') await loadEngagementAnalytics(true);
     else if (activeTab === 'referrals')
       await loadReferralMentorshipAnalytics(true);
-    else await loadPlatformAnalytics(true);
+    else if (activeTab === 'platform') await loadPlatformAnalytics(true);
+    else await loadTrendingAnalytics(true);
   }, [
     activeTab,
     targetUserId,
@@ -788,6 +849,7 @@ const AdminAnalyticsPage: FC = () => {
     loadEngagementAnalytics,
     loadReferralMentorshipAnalytics,
     loadPlatformAnalytics,
+    loadTrendingAnalytics,
   ]);
 
   // Manual refresh handler — shows button spinner, NOT the page overlay
@@ -796,6 +858,20 @@ const AdminAnalyticsPage: FC = () => {
     await silentRefreshCurrentTab();
     setIsRefreshing(false);
   }, [silentRefreshCurrentTab]);
+
+  const handleRecalculateTrending = useCallback(async () => {
+    setRecalculatingTrending(true);
+    try {
+      await adminAnalyticsService.recalculateTrending();
+      await loadTrendingAnalytics(true);
+      toast('Trending scores recalculated successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to recalculate trending scores', err);
+      toast('Failed to recalculate trending scores.', 'error');
+    } finally {
+      setRecalculatingTrending(false);
+    }
+  }, [loadTrendingAnalytics, toast]);
 
   // Auto-refresh interval effect
   useEffect(() => {
@@ -1019,7 +1095,11 @@ const AdminAnalyticsPage: FC = () => {
                 void handleManualRefresh();
               }}
               isLoading={isRefreshing}
-              disabled={!targetUserId}
+              disabled={
+                activeTab !== 'platform' &&
+                activeTab !== 'trending' &&
+                !targetUserId
+              }
             />
 
             <LastUpdatedBadge lastUpdated={lastUpdated} />
@@ -1039,36 +1119,39 @@ const AdminAnalyticsPage: FC = () => {
           <Tab label="Engagement Analytics" value="engagement" />
           <Tab label="Referrals & Mentorship" value="referrals" />
           <Tab label="Platform Insights" value="platform" />
+          <Tab label="Trending Score" value="trending" />
         </Tabs>
       </Box>
 
       {/* Shared controls */}
       <Stack spacing={2} sx={{ mb: 3 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              label="Target User"
-              select
-              inputProps={{ 'aria-label': 'Select target user for analytics' }}
-              value={selectedUserExists ? targetUserId : ''}
-              onChange={(event) => setTargetUserId(event.target.value)}
-              helperText="Select a user account to inspect analytics"
-              disabled={loadingUsers || userOptions.length === 0}
-              sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
-            >
-              {userOptions.length === 0 ? (
-                <MenuItem value="" disabled>
-                  No users available
-                </MenuItem>
-              ) : null}
-              {userOptions.map((option) => (
-                <MenuItem key={option.id} value={option.id}>
-                  {`${option.name || 'Unnamed User'} (${option.email}) - ${option.role}`}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+          {activeTab !== 'trending' && (
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Target User"
+                select
+                inputProps={{ 'aria-label': 'Select target user for analytics' }}
+                value={selectedUserExists ? targetUserId : ''}
+                onChange={(event) => setTargetUserId(event.target.value)}
+                helperText="Select a user account to inspect analytics"
+                disabled={loadingUsers || userOptions.length === 0}
+                sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
+              >
+                {userOptions.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No users available
+                  </MenuItem>
+                ) : null}
+                {userOptions.map((option) => (
+                  <MenuItem key={option.id} value={option.id}>
+                    {`${option.name || 'Unnamed User'} (${option.email}) - ${option.role}`}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
 
           <Grid item xs={12} md={4}>
             <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} />
@@ -1149,6 +1232,38 @@ const AdminAnalyticsPage: FC = () => {
               <MenuItem value="line">Line</MenuItem>
               <MenuItem value="bar">Bar</MenuItem>
             </TextField>
+          ) : null}
+
+          {activeTab === 'trending' ? (
+            <TextField
+              select
+              size="small"
+              label="Trending Period"
+              inputProps={{ 'aria-label': 'Select trending period' }}
+              value={trendingPeriod}
+              onChange={(event) =>
+                setTrendingPeriod(event.target.value as TrendingPeriod)
+              }
+              sx={{ minWidth: 190, '& .MuiInputBase-root': { minHeight: 44 } }}
+            >
+              <MenuItem value="hour">Hour</MenuItem>
+              <MenuItem value="day">Day</MenuItem>
+              <MenuItem value="week">Week</MenuItem>
+            </TextField>
+          ) : null}
+
+          {activeTab === 'trending' ? (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => {
+                void handleRecalculateTrending();
+              }}
+              disabled={recalculatingTrending}
+              sx={{ minHeight: 44 }}
+            >
+              {recalculatingTrending ? 'Recalculating...' : 'Recalculate Scores'}
+            </Button>
           ) : null}
 
           <ExportButton
@@ -1678,6 +1793,137 @@ const AdminAnalyticsPage: FC = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <Typography color="text.secondary">
               Loading platform insights...
+            </Typography>
+          </Box>
+        )
+      ) : null}
+
+      {activeTab === 'trending' ? (
+        !loading && trendingData ? (
+          <Stack spacing={3} ref={chartExportRef}>
+            {isMetricEnabled('trending.summary') ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Trending Period
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {trendingData.period}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Source: {trendingData.source}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Top Score
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                      {trendingData.posts[0]?.score?.toFixed(2) || '0.00'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Highest ranked trending post
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                    <Typography variant="overline" color="text.secondary">
+                      Last Calculated
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {new Date(trendingData.calculatedAt).toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Updated hourly with smoothing
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            ) : null}
+
+            {isMetricEnabled('trending.list') ? (
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                  Trending Posts Leaderboard
+                </Typography>
+                <Stack spacing={1.5}>
+                  {trendingData.posts.length === 0 ? (
+                    <Typography color="text.secondary">
+                      No trending posts found for this period.
+                    </Typography>
+                  ) : (
+                    trendingData.posts.map((item) => (
+                      <Box
+                        key={item.postId}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1.5,
+                          p: 1.75,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                            #{item.rank} {item.subject}
+                          </Typography>
+                          <Typography variant="subtitle2" color="primary.main">
+                            Score {item.score.toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 0.75 }}
+                        >
+                          {item.contentPreview}
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                            mt: 1,
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Upvotes: {item.upvotes}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Comments: {item.comments}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Author: {item.creator.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Created: {new Date(item.createdAt).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))
+                  )}
+                </Stack>
+              </Paper>
+            ) : null}
+          </Stack>
+        ) : loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <Typography color="text.secondary">
+              Loading trending scores...
             </Typography>
           </Box>
         )
