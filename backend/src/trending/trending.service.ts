@@ -47,13 +47,7 @@ export class TrendingService implements OnModuleInit {
   ) {}
 
   private get trendingCache() {
-    return (this.prisma as any).trendingCache as {
-      count: (args: unknown) => Promise<number>;
-      findMany: (args: unknown) => Promise<unknown[]>;
-      findUnique: (args: unknown) => Promise<unknown>;
-      deleteMany: (args: unknown) => Promise<unknown>;
-      upsert: (args: unknown) => Promise<unknown>;
-    };
+    return this.prisma.trendingCache;
   }
 
   async onModuleInit() {

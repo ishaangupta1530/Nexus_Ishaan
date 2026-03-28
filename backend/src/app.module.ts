@@ -2,7 +2,6 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -69,7 +68,6 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
         limit: securityConfig.rateLimit.limit,
       },
     ]),
-    ScheduleModule.forRoot(),
     PrismaModule,
     CommonModule, // Global common services including CacheService
     AuthModule,
