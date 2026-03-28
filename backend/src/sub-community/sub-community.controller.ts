@@ -67,33 +67,36 @@ export class SubCommunityController {
   async myOwned(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
     @GetCurrentUser('userId') userId?: string,
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyOwnedSubCommunities(userId, p, l);
+    return this.subCommunityService.findMyOwnedSubCommunities(userId, p, l, q);
   }
 
   @Get('my/moderated')
   async myModerated(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
     @GetCurrentUser('userId') userId?: string,
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyModeratedSubCommunities(userId, p, l);
+    return this.subCommunityService.findMyModeratedSubCommunities(userId, p, l, q);
   }
 
   @Get('my/member')
   async myMember(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
     @GetCurrentUser('userId') userId?: string,
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyMemberSubCommunities(userId, p, l);
+    return this.subCommunityService.findMyMemberSubCommunities(userId, p, l, q);
   }
 
   @Get(':id')

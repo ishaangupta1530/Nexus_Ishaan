@@ -228,6 +228,23 @@ model Project {
   @@map("projects")
 }
 
+model TrendingTopic {
+  id              String   @id @default(cuid())
+  topic           String
+  period          String   @default("week")
+  relatedKeywords String[]
+  postCount       Int
+  engagementCount Int
+  velocity        Float
+  trendDirection  String
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime @default(now())
+
+  @@unique([topic, period])
+  @@index([period, velocity, lastSeenAt])
+  @@map("trending_topics")
+}
+
 model Startup {
   id                String            @id @default(uuid())
   name              String

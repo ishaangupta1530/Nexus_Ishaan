@@ -13,8 +13,11 @@ import {
   CardContent,
   Skeleton,
   Fade,
+  Autocomplete,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
-import { Add } from '@mui/icons-material';
+import { Add, Search } from '@mui/icons-material';
 import { useSubCommunity } from '../../contexts/SubCommunityContext';
 import { subCommunityService } from '../../services/subCommunityService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -95,6 +98,15 @@ const MySubCommunityPage: FC = () => {
 
   const [activeTab, setActiveTab] = useState(0);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [topicSuggestions, setTopicSuggestions] = useState<
+    Array<{
+      topic: string;
+      postCount: number;
+      trendDirection: 'UP' | 'DOWN' | 'STABLE';
+    }>
+  >([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [filteredCommunities, setFilteredCommunities] = useState<{
     owned: SubCommunity[];
     moderated: SubCommunity[];
@@ -131,11 +143,18 @@ const MySubCommunityPage: FC = () => {
     [location.search]
   );
 
+  const getSearchFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get('q') || '').trim();
+  }, [location.search]);
+
   const handlePageChange = (tabIndex: number, page: number) => {
     const key = getPageKeyForTab(tabIndex);
     const params = new URLSearchParams(location.search);
     // set new page for this tab and remove other tab page params
     params.set(key, String(page));
+    const q = getSearchFromUrl();
+    if (q) params.set('q', q);
     ['ownedPage', 'moderatedPage', 'memberPage']
       .filter((k) => k !== key)
       .forEach((k) => params.delete(k));
@@ -154,13 +173,18 @@ const MySubCommunityPage: FC = () => {
 
   // Fetch only the active tab category (one network call at a time)
   useEffect(() => {
+    setSearch(getSearchFromUrl());
+  }, [getSearchFromUrl]);
+
+  useEffect(() => {
+    const q = getSearchFromUrl();
     const page = getPageFromUrl(activeTab);
     if (!user) return;
 
     if (activeTab === 0) {
       setLoadingOwned(true);
       subCommunityService
-        .getMyOwnedSubCommunities(page, PAGE_SIZE)
+        .getMyOwnedSubCommunities(page, PAGE_SIZE, q)
         .then((resp) => {
           setFilteredCommunities((prev) => ({ ...prev, owned: resp.data }));
           setOwnedPages(resp.pagination?.totalPages ?? 1);
@@ -170,7 +194,7 @@ const MySubCommunityPage: FC = () => {
     } else if (activeTab === 1) {
       setLoadingModerated(true);
       subCommunityService
-        .getMyModeratedSubCommunities(page, PAGE_SIZE)
+        .getMyModeratedSubCommunities(page, PAGE_SIZE, q)
         .then((resp) => {
           setFilteredCommunities((prev) => ({ ...prev, moderated: resp.data }));
           setModeratedPages(resp.pagination?.totalPages ?? 1);
@@ -180,7 +204,7 @@ const MySubCommunityPage: FC = () => {
     } else {
       setLoadingMember(true);
       subCommunityService
-        .getMyMemberSubCommunities(page, PAGE_SIZE)
+        .getMyMemberSubCommunities(page, PAGE_SIZE, q)
         .then((resp) => {
           setFilteredCommunities((prev) => ({ ...prev, member: resp.data }));
           setMemberPages(resp.pagination?.totalPages ?? 1);
@@ -188,7 +212,93 @@ const MySubCommunityPage: FC = () => {
         .catch((e) => console.error('Failed to fetch member communities', e))
         .finally(() => setLoadingMember(false));
     }
-  }, [location.search, activeTab, user, getPageFromUrl]);
+  }, [location.search, activeTab, user, getPageFromUrl, getSearchFromUrl]);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setTopicSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setLoadingSuggestions(true);
+      try {
+        const response = await subCommunityService.getTrendingTopicSuggestions({
+          period: 'week',
+          limit: 6,
+          q,
+        });
+
+        if (!cancelled) {
+          setTopicSuggestions(
+            (response.topics || []).map((topic) => ({
+              topic: topic.topic,
+              postCount: topic.postCount,
+              trendDirection: topic.trendDirection,
+            })),
+          );
+        }
+      } catch (error) {
+        console.warn('Failed to load subcommunity topic suggestions', error);
+        if (!cancelled) setTopicSuggestions([]);
+      } finally {
+        if (!cancelled) setLoadingSuggestions(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search]);
+
+  const applySearch = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(location.search);
+      const key = getPageKeyForTab(activeTab);
+
+      params.set(key, '1');
+      ['ownedPage', 'moderatedPage', 'memberPage']
+        .filter((k) => k !== key)
+        .forEach((k) => params.delete(k));
+
+      const cleaned = value.trim();
+      if (cleaned) params.set('q', cleaned);
+      else params.delete('q');
+
+      const base =
+        activeTab === 0
+          ? '/subcommunities/my/owned'
+          : activeTab === 1
+            ? '/subcommunities/my/moderated'
+            : '/subcommunities/my/member';
+      navigate(`${base}?${params.toString()}`);
+    },
+    [activeTab, location.search, navigate],
+  );
+
+  useEffect(() => {
+    const currentQ = getSearchFromUrl();
+    const nextQ = search.trim();
+
+    if (currentQ === nextQ) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      applySearch(nextQ);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [search, getSearchFromUrl, applySearch]);
+
+  const applySuggestion = (topic: string) => {
+    setSearch(topic);
+    applySearch(topic);
+    setTopicSuggestions([]);
+  };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -294,6 +404,74 @@ const MySubCommunityPage: FC = () => {
         >
           ← Back to All Communities
         </Button>
+      </Box>
+
+      {/* Search Communities */}
+      <Box sx={{ mb: 3 }}>
+        <Autocomplete
+          freeSolo
+          fullWidth
+          options={topicSuggestions}
+          filterOptions={(options) => options}
+          loading={loadingSuggestions}
+          noOptionsText={search.trim().length < 2 ? 'Type at least 2 characters' : 'No topic suggestions'}
+          getOptionLabel={(option) =>
+            typeof option === 'string' ? option : option.topic
+          }
+          inputValue={search}
+          onInputChange={(_event, value) => {
+            setSearch(value);
+          }}
+          onChange={(_event, value) => {
+            if (!value) return;
+            if (typeof value === 'string') {
+              applySuggestion(value);
+              return;
+            }
+            applySuggestion(value.topic);
+          }}
+          renderOption={(props, option) => (
+            <li {...props} key={option.topic}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {option.topic}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {option.postCount} posts • {option.trendDirection} trend
+                </Typography>
+              </Box>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              size="small"
+              label="Search my communities"
+              InputProps={{
+                ...params.InputProps,
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          )}
+        />
+
+        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              setSearch('');
+              applySearch('');
+              setTopicSuggestions([]);
+            }}
+          >
+            Reset
+          </Button>
+        </Box>
       </Box>
 
       {/* Summary Stats */}

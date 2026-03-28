@@ -358,14 +358,29 @@ export class SubCommunityService {
     userId: string | undefined,
     ownedPage: number,
     ownedLimit: number,
+    q?: string,
   ) {
     if (!userId) {
       throw new NotFoundException('User not found');
     }
 
+    const searchWhere = q?.trim()
+      ? {
+          OR: [
+            { name: { contains: q.trim(), mode: 'insensitive' as const } },
+            {
+              description: {
+                contains: q.trim(),
+                mode: 'insensitive' as const,
+              },
+            },
+          ],
+        }
+      : {};
+
     const [ownedData, ownedTotal] = await Promise.all([
       this.prisma.subCommunity.findMany({
-        where: { ownerId: userId },
+        where: { ownerId: userId, ...searchWhere },
         skip: (ownedPage - 1) * ownedLimit,
         take: ownedLimit,
         include: {
@@ -381,7 +396,7 @@ export class SubCommunityService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.subCommunity.count({ where: { ownerId: userId } }),
+      this.prisma.subCommunity.count({ where: { ownerId: userId, ...searchWhere } }),
     ]);
 
     const makePagination = (page: number, limit: number, total: number) => {
@@ -408,14 +423,32 @@ export class SubCommunityService {
     userId: string | undefined,
     moderatedPage: number,
     moderatedLimit: number,
+    q?: string,
   ) {
     if (!userId) {
       throw new NotFoundException('User not found');
     }
 
+    const searchWhere = q?.trim()
+      ? {
+          OR: [
+            { name: { contains: q.trim(), mode: 'insensitive' as const } },
+            {
+              description: {
+                contains: q.trim(),
+                mode: 'insensitive' as const,
+              },
+            },
+          ],
+        }
+      : {};
+
     const [moderatedData, moderatedTotal] = await Promise.all([
       this.prisma.subCommunity.findMany({
-        where: { members: { some: { userId, role: 'MODERATOR' } } },
+        where: {
+          members: { some: { userId, role: 'MODERATOR' } },
+          ...searchWhere,
+        },
         skip: (moderatedPage - 1) * moderatedLimit,
         take: moderatedLimit,
         include: {
@@ -432,7 +465,10 @@ export class SubCommunityService {
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.subCommunity.count({
-        where: { members: { some: { userId, role: 'MODERATOR' } } },
+        where: {
+          members: { some: { userId, role: 'MODERATOR' } },
+          ...searchWhere,
+        },
       }),
     ]);
 
@@ -464,12 +500,28 @@ export class SubCommunityService {
     userId: string | undefined,
     memberPage: number,
     memberLimit: number,
+    q?: string,
   ) {
+    const searchWhere = q?.trim()
+      ? {
+          OR: [
+            { name: { contains: q.trim(), mode: 'insensitive' as const } },
+            {
+              description: {
+                contains: q.trim(),
+                mode: 'insensitive' as const,
+              },
+            },
+          ],
+        }
+      : {};
+
     const [memberData, memberTotal] = await Promise.all([
       this.prisma.subCommunity.findMany({
         where: {
           members: { some: { userId } },
           NOT: { ownerId: userId }, // exclude sub-communities owned by the user
+          ...searchWhere,
         },
         skip: (memberPage - 1) * memberLimit,
         take: memberLimit,
@@ -490,6 +542,7 @@ export class SubCommunityService {
         where: {
           members: { some: { userId } },
           NOT: { ownerId: userId }, // ensure count matches filtered results
+          ...searchWhere,
         },
       }),
     ]);

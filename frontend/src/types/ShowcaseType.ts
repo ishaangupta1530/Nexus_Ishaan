@@ -169,3 +169,19 @@ export interface Tags {
   id: string;
   name: string;
 }
+
+export interface TrendingTopicSuggestion {
+  topic: string;
+  relatedKeywords: string[];
+  postCount: number;
+  engagementCount: number;
+  velocity: number;
+  trendDirection: 'UP' | 'DOWN' | 'STABLE';
+}
+
+export interface TrendingTopicsResponse {
+  period: 'hour' | 'day' | 'week';
+  count: number;
+  topics: TrendingTopicSuggestion[];
+  generatedAt: string;
+}

@@ -242,12 +242,14 @@ export const subCommunityService = {
   },
   getMyModeratedSubCommunities: async (
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    q?: string
   ): Promise<{
     data: SubCommunity[];
     pagination: PaginationData;
   }> => {
     const params: Record<string, unknown> = { page, limit };
+    if (q?.trim()) params.q = q.trim();
     const response = await api.get('/sub-community/my/moderated', { params });
     console.log(
       "Fetched current user's moderated sub-communities:",
@@ -257,24 +259,28 @@ export const subCommunityService = {
   },
   getMyOwnedSubCommunities: async (
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    q?: string
   ): Promise<{
     data: SubCommunity[];
     pagination: PaginationData;
   }> => {
     const params: Record<string, unknown> = { page, limit };
+    if (q?.trim()) params.q = q.trim();
     const response = await api.get('/sub-community/my/owned', { params });
     console.log("Fetched current user's owned sub-communities:", response.data);
     return response.data.owned;
   },
   getMyMemberSubCommunities: async (
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    q?: string
   ): Promise<{
     data: SubCommunity[];
     pagination: PaginationData;
   }> => {
     const params: Record<string, unknown> = { page, limit };
+    if (q?.trim()) params.q = q.trim();
     const response = await api.get('/sub-community/my/member', { params });
     console.log(
       "Fetched current user's member sub-communities:",
@@ -302,5 +308,26 @@ export const subCommunityService = {
   deleteType: async (id: string): Promise<void> => {
     console.log(`Deleting sub-community type with id: ${id}`);
     await api.delete(`/sub-community-types/${id}`);
+  },
+
+  getTrendingTopicSuggestions: async (params?: {
+    period?: 'hour' | 'day' | 'week';
+    limit?: number;
+    q?: string;
+  }): Promise<{
+    period: 'hour' | 'day' | 'week';
+    count: number;
+    topics: Array<{
+      topic: string;
+      relatedKeywords: string[];
+      postCount: number;
+      engagementCount: number;
+      velocity: number;
+      trendDirection: 'UP' | 'DOWN' | 'STABLE';
+    }>;
+    generatedAt: string;
+  }> => {
+    const response = await api.get('/trending/topics', { params });
+    return response.data;
   },
 };

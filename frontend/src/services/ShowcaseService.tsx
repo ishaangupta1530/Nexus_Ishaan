@@ -6,6 +6,7 @@ import {
   FilterProjectInterface,
   ProjectTeam,
   ProjectCommentsResponse,
+  TrendingTopicsResponse,
 } from '@/types/ShowcaseType';
 import api from './api';
 import { getErrorMessage } from '@/utils/errorHandler';
@@ -373,6 +374,21 @@ const ShowcaseService = {
     } catch (error) {
       throw new Error(
         'Failed to get project types with error: ' + getErrorMessage(error)
+      );
+    }
+  },
+
+  getTrendingTopics: async (params?: {
+    period?: 'hour' | 'day' | 'week';
+    limit?: number;
+    q?: string;
+  }): Promise<TrendingTopicsResponse> => {
+    try {
+      const response = await api.get('/trending/topics', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(
+        'Failed to get trending topics with error: ' + getErrorMessage(error)
       );
     }
   },

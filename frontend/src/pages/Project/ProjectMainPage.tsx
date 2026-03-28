@@ -520,7 +520,11 @@ const ProjectsMainPage: FC = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.2, delay: 0.08 }}
         >
-          <ProjectFilter filters={filters} onFilterChange={setFilters} />
+          <ProjectFilter
+            filters={filters}
+            onFilterChange={setFilters}
+            showTopicSuggestions={Boolean(user?.id)}
+          />
         </motion.div>
 
         {/* Tabs for different views */}

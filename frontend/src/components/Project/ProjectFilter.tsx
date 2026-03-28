@@ -1,5 +1,11 @@
 import { FC, useEffect, useState } from 'react';
-import { FilterProjectInterface, status, sortBy } from '@/types/ShowcaseType';
+import {
+  FilterProjectInterface,
+  status,
+  sortBy,
+  TrendingTopicSuggestion,
+} from '@/types/ShowcaseType';
+import { ShowcaseService } from '@/services/ShowcaseService';
 import {
   Box,
   TextField,
@@ -12,6 +18,10 @@ import {
   IconButton,
   Grid,
   Badge,
+  List,
+  ListItemButton,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import { Close, Search, FilterList } from '@mui/icons-material';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -19,11 +29,20 @@ import { AnimatePresence, motion } from 'framer-motion';
 interface ProjectFilterProps {
   filters: FilterProjectInterface;
   onFilterChange: (filters: FilterProjectInterface) => void;
+  showTopicSuggestions?: boolean;
 }
 
-const ProjectFilter: FC<ProjectFilterProps> = ({ filters, onFilterChange }) => {
+const ProjectFilter: FC<ProjectFilterProps> = ({
+  filters,
+  onFilterChange,
+  showTopicSuggestions = false,
+}) => {
   const [localFilters, setLocalFilters] = useState(filters);
   const [expanded, setExpanded] = useState(false);
+  const [topicSuggestions, setTopicSuggestions] = useState<
+    TrendingTopicSuggestion[]
+  >([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // Keep localFilters in sync when parent `filters` prop changes
   useEffect(() => {
@@ -49,6 +68,61 @@ const ProjectFilter: FC<ProjectFilterProps> = ({ filters, onFilterChange }) => {
 
   const handleClearSearch = () => {
     setLocalFilters((prev) => ({ ...prev, search: '', cursor: undefined }));
+    setTopicSuggestions([]);
+  };
+
+  useEffect(() => {
+    if (!showTopicSuggestions) {
+      setTopicSuggestions([]);
+      return;
+    }
+
+    const searchValue = localFilters.search?.trim() || '';
+    if (searchValue.length < 2) {
+      setTopicSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setLoadingSuggestions(true);
+      try {
+        const response = await ShowcaseService.getTrendingTopics({
+          period: 'week',
+          limit: 6,
+          q: searchValue,
+        });
+
+        if (!cancelled) {
+          setTopicSuggestions(response.topics || []);
+        }
+      } catch (error) {
+        console.warn('Failed to load topic suggestions', error);
+        if (!cancelled) {
+          setTopicSuggestions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSuggestions(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [localFilters.search, showTopicSuggestions]);
+
+  const applyTopicSuggestion = (topic: string) => {
+    const nextFilters = {
+      ...localFilters,
+      search: topic,
+      cursor: undefined,
+    };
+    setLocalFilters(nextFilters);
+    onFilterChange(nextFilters);
+    setTopicSuggestions([]);
   };
 
   const updateLocalFilter = (
@@ -155,6 +229,45 @@ const ProjectFilter: FC<ProjectFilterProps> = ({ filters, onFilterChange }) => {
               Apply
             </Button>
           </Box>
+
+          {showTopicSuggestions &&
+            (loadingSuggestions || topicSuggestions.length > 0) && (
+              <Paper
+                elevation={1}
+                sx={{
+                  mt: 1,
+                  borderRadius: 2,
+                  border: 1,
+                  borderColor: 'divider',
+                  overflow: 'hidden',
+                }}
+              >
+                <List dense disablePadding>
+                  {loadingSuggestions && (
+                    <Box sx={{ px: 2, py: 1.2 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Loading topic suggestions...
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {!loadingSuggestions &&
+                    topicSuggestions.map((item, index) => (
+                      <Box key={item.topic}>
+                        <ListItemButton
+                          onClick={() => applyTopicSuggestion(item.topic)}
+                        >
+                          <ListItemText
+                            primary={item.topic}
+                            secondary={`${item.postCount} posts • ${item.trendDirection} trend`}
+                          />
+                        </ListItemButton>
+                        {index < topicSuggestions.length - 1 && <Divider />}
+                      </Box>
+                    ))}
+                </List>
+              </Paper>
+            )}
         </Grid>
 
         <Grid item>

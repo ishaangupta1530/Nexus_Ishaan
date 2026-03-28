@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -32,6 +33,7 @@ import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ExportModule } from './export/export.module';
 import { QueueModule } from './queue/queue.module';
+import { TrendingTopicsModule } from './trending/trending-topics.module';
 import { securityConfig } from './common/config/security.config';
 import { envValidationSchema } from './common/config/env.validation';
 import { WinstonLoggerService } from './common/logger/winston-logger.service';
@@ -64,6 +66,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
         limit: securityConfig.rateLimit.limit,
       },
     ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     CommonModule, // Global common services including CacheService
     AuthModule,
@@ -92,6 +95,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
     MetricsModule,
     ExportModule,
     QueueModule,
+    TrendingTopicsModule,
   ],
   controllers: [AppController, FrontendErrorController],
   providers: [
