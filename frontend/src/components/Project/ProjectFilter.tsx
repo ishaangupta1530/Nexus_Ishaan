@@ -194,7 +194,11 @@ const ProjectFilter: FC<ProjectFilterProps> = ({
               placeholder="Search projects..."
               onSearch={handleGlobalSearch}
             />
-            <Button variant="outlined" onClick={handleClearSearch} sx={{ whiteSpace: 'nowrap' }}>
+            <Button
+              variant="outlined"
+              onClick={handleClearSearch}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
               Clear
             </Button>
           </Box>

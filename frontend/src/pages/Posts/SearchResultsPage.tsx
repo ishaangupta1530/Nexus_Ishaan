@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useCallback, useRef } from 'react';
+qcd import { FC, useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -60,7 +60,12 @@ const Highlight: FC<{ text: string; query: string }> = ({ text, query }) => {
           <Box
             key={i}
             component="mark"
-            sx={{ bgcolor: 'warning.light', color: 'inherit', borderRadius: 0.5, px: 0.25 }}
+            sx={{
+              bgcolor: 'warning.light',
+              color: 'inherit',
+              borderRadius: 0.5,
+              px: 0.25,
+            }}
           >
             {part}
           </Box>
@@ -102,12 +107,20 @@ const SearchResultsPage: FC = () => {
     hasPrev: false,
   });
   const [loading, setLoading] = useState(false);
-  const [trendingQueries, setTrendingQueries] = useState<{ query: string; count: number }[]>([]);
+  const [trendingQueries, setTrendingQueries] = useState<
+    { query: string; count: number }[]
+  >([]);
 
   const latestRef = useRef(0);
 
   const runSearch = useCallback(
-    async (q: string, type: SearchType, pg: number, df?: string, dt?: string) => {
+    async (
+      q: string,
+      type: SearchType,
+      pg: number,
+      df?: string,
+      dt?: string
+    ) => {
       if (!q.trim() || q.trim().length < 2) return;
       setLoading(true);
       const ticket = ++latestRef.current;
@@ -139,7 +152,8 @@ const SearchResultsPage: FC = () => {
 
   useEffect(() => {
     const urlQ = new URLSearchParams(location.search).get('q') || '';
-    const urlType = (new URLSearchParams(location.search).get('type') as SearchType) || 'all';
+    const urlType =
+      (new URLSearchParams(location.search).get('type') as SearchType) || 'all';
     const urlDf = new URLSearchParams(location.search).get('dateFrom') || '';
     const urlDt = new URLSearchParams(location.search).get('dateTo') || '';
     setQuery(urlQ);
@@ -250,7 +264,13 @@ const SearchResultsPage: FC = () => {
                 size="small"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
-                InputProps={{ startAdornment: <InputAdornment position="start"><CalendarToday fontSize="small" /></InputAdornment> }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CalendarToday fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
               />
@@ -262,13 +282,25 @@ const SearchResultsPage: FC = () => {
                 size="small"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
-                InputProps={{ startAdornment: <InputAdornment position="start"><CalendarToday fontSize="small" /></InputAdornment> }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CalendarToday fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={2}>
-              <Button variant="contained" size="small" fullWidth onClick={handleApplyFilters} sx={{ textTransform: 'none' }}>
+              <Button
+                variant="contained"
+                size="small"
+                fullWidth
+                onClick={handleApplyFilters}
+                sx={{ textTransform: 'none' }}
+              >
                 Apply
               </Button>
             </Grid>
@@ -284,21 +316,50 @@ const SearchResultsPage: FC = () => {
         variant="scrollable"
         scrollButtons="auto"
       >
-        <Tab label="All" value="all" icon={<SearchIcon fontSize="small" />} iconPosition="start" />
         <Tab
-          label={<Badge badgeContent={posts.length || undefined} color="primary" max={99}>Posts</Badge>}
+          label="All"
+          value="all"
+          icon={<SearchIcon fontSize="small" />}
+          iconPosition="start"
+        />
+        <Tab
+          label={
+            <Badge
+              badgeContent={posts.length || undefined}
+              color="primary"
+              max={99}
+            >
+              Posts
+            </Badge>
+          }
           value="posts"
           icon={<Article fontSize="small" />}
           iconPosition="start"
         />
         <Tab
-          label={<Badge badgeContent={users.length || undefined} color="primary" max={99}>People</Badge>}
+          label={
+            <Badge
+              badgeContent={users.length || undefined}
+              color="primary"
+              max={99}
+            >
+              People
+            </Badge>
+          }
           value="users"
           icon={<Person fontSize="small" />}
           iconPosition="start"
         />
         <Tab
-          label={<Badge badgeContent={communities.length || undefined} color="primary" max={99}>Communities</Badge>}
+          label={
+            <Badge
+              badgeContent={communities.length || undefined}
+              color="primary"
+              max={99}
+            >
+              Communities
+            </Badge>
+          }
           value="communities"
           icon={<Group fontSize="small" />}
           iconPosition="start"
@@ -313,75 +374,115 @@ const SearchResultsPage: FC = () => {
       )}
 
       {/* Empty */}
-      {!loading && query && posts.length === 0 && users.length === 0 && communities.length === 0 && (
-        <Box sx={{ textAlign: 'center', mt: 6 }}>
-          <SearchIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
-          <Typography variant="h6" color="text.secondary" mt={1}>
-            No results for &ldquo;{query}&rdquo;
-          </Typography>
-          <Typography variant="body2" color="text.disabled" mt={0.5}>
-            Try different keywords or remove filters
-          </Typography>
-        </Box>
-      )}
+      {!loading &&
+        query &&
+        posts.length === 0 &&
+        users.length === 0 &&
+        communities.length === 0 && (
+          <Box sx={{ textAlign: 'center', mt: 6 }}>
+            <SearchIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
+            <Typography variant="h6" color="text.secondary" mt={1}>
+              No results for &ldquo;{query}&rdquo;
+            </Typography>
+            <Typography variant="body2" color="text.disabled" mt={0.5}>
+              Try different keywords or remove filters
+            </Typography>
+          </Box>
+        )}
 
       {/* Results */}
       {(!loading || page > 1) && (
         <Stack spacing={2}>
-          {(activeType === 'all' || activeType === 'posts') && posts.length > 0 && (
-            <Box>
-              {activeType === 'all' && (
-                <Typography variant="subtitle2" color="text.secondary" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Article fontSize="small" /> Posts
-                </Typography>
-              )}
-              <Stack spacing={1}>
-                {posts.map((post) => (
-                  <PostCard key={post.id} post={post} query={query} onClick={handleResultClick} />
-                ))}
-              </Stack>
-            </Box>
-          )}
+          {(activeType === 'all' || activeType === 'posts') &&
+            posts.length > 0 && (
+              <Box>
+                {activeType === 'all' && (
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    mb={1}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                  >
+                    <Article fontSize="small" /> Posts
+                  </Typography>
+                )}
+                <Stack spacing={1}>
+                  {posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      query={query}
+                      onClick={handleResultClick}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
 
-          {(activeType === 'all' || activeType === 'users') && users.length > 0 && (
-            <Box>
-              {activeType === 'all' && <Divider sx={{ my: 1 }} />}
-              {activeType === 'all' && (
-                <Typography variant="subtitle2" color="text.secondary" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Person fontSize="small" /> People
-                </Typography>
-              )}
-              <Grid container spacing={1}>
-                {users.map((u) => (
-                  <Grid item xs={12} sm={6} key={u.id}>
-                    <UserCard user={u} query={query} onClick={handleResultClick} />
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          )}
+          {(activeType === 'all' || activeType === 'users') &&
+            users.length > 0 && (
+              <Box>
+                {activeType === 'all' && <Divider sx={{ my: 1 }} />}
+                {activeType === 'all' && (
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    mb={1}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                  >
+                    <Person fontSize="small" /> People
+                  </Typography>
+                )}
+                <Grid container spacing={1}>
+                  {users.map((u) => (
+                    <Grid item xs={12} sm={6} key={u.id}>
+                      <UserCard
+                        user={u}
+                        query={query}
+                        onClick={handleResultClick}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
 
-          {(activeType === 'all' || activeType === 'communities') && communities.length > 0 && (
-            <Box>
-              {activeType === 'all' && <Divider sx={{ my: 1 }} />}
-              {activeType === 'all' && (
-                <Typography variant="subtitle2" color="text.secondary" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Group fontSize="small" /> Communities
-                </Typography>
-              )}
-              <Grid container spacing={1}>
-                {communities.map((c) => (
-                  <Grid item xs={12} sm={6} key={c.id}>
-                    <CommunityCard community={c} query={query} onClick={handleResultClick} />
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          )}
+          {(activeType === 'all' || activeType === 'communities') &&
+            communities.length > 0 && (
+              <Box>
+                {activeType === 'all' && <Divider sx={{ my: 1 }} />}
+                {activeType === 'all' && (
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    mb={1}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                  >
+                    <Group fontSize="small" /> Communities
+                  </Typography>
+                )}
+                <Grid container spacing={1}>
+                  {communities.map((c) => (
+                    <Grid item xs={12} sm={6} key={c.id}>
+                      <CommunityCard
+                        community={c}
+                        query={query}
+                        onClick={handleResultClick}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
 
           {pagination.hasNext && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-              <Button variant="outlined" onClick={handleLoadMore} disabled={loading} sx={{ textTransform: 'none' }}>
+              <Button
+                variant="outlined"
+                onClick={handleLoadMore}
+                disabled={loading}
+                sx={{ textTransform: 'none' }}
+              >
                 {loading ? <CircularProgress size={20} /> : 'Load More'}
               </Button>
             </Box>
@@ -393,8 +494,14 @@ const SearchResultsPage: FC = () => {
       {trendingQueries.length > 0 && (
         <Box sx={{ mt: 4 }}>
           <Divider sx={{ mb: 2 }} />
-          <Typography variant="subtitle2" color="text.secondary" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <TrendingUp fontSize="small" color="primary" /> People also searched for
+          <Typography
+            variant="subtitle2"
+            color="text.secondary"
+            mb={1}
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+          >
+            <TrendingUp fontSize="small" color="primary" /> People also searched
+            for
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {trendingQueries.map(({ query: tq }) => (
@@ -418,43 +525,83 @@ const SearchResultsPage: FC = () => {
 // ──────────────────────────────────────────────────────────────
 // Post Card
 // ──────────────────────────────────────────────────────────────
-const PostCard: FC<{ post: PostResult; query: string; onClick: (id: string) => void }> = ({
-  post,
-  query,
-  onClick,
-}) => {
+const PostCard: FC<{
+  post: PostResult;
+  query: string;
+  onClick: (id: string) => void;
+}> = ({ post, query, onClick }) => {
   const navigate = useNavigate();
   const handleClick = () => {
     onClick(post.id);
     navigate(`/posts/${post.id}`);
   };
-  const snippet = post.content.length > 200 ? post.content.slice(0, 200) + '…' : post.content;
+  const snippet =
+    post.content.length > 200 ? post.content.slice(0, 200) + '…' : post.content;
 
   return (
     <Card
       variant="outlined"
-      sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s', borderRadius: 2 }}
+      sx={{
+        cursor: 'pointer',
+        '&:hover': { boxShadow: 3 },
+        transition: 'box-shadow 0.2s',
+        borderRadius: 2,
+      }}
       onClick={handleClick}
     >
       <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, mr: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            mb: 0.5,
+          }}
+        >
+          <Typography
+            variant="subtitle2"
+            fontWeight={600}
+            sx={{ flex: 1, mr: 1 }}
+          >
             <Highlight text={post.subject} query={query} />
           </Typography>
-          <Tooltip title={`Relevance: ${(post.relevanceScore * 100).toFixed(0)}%`}>
-            <Chip label={`${(post.relevanceScore * 100).toFixed(0)}%`} size="small" color="primary" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
+          <Tooltip
+            title={`Relevance: ${(post.relevanceScore * 100).toFixed(0)}%`}
+          >
+            <Chip
+              label={`${(post.relevanceScore * 100).toFixed(0)}%`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontSize: 10, height: 20 }}
+            />
           </Tooltip>
         </Box>
         <Typography variant="body2" color="text.secondary" mb={0.75}>
           <Highlight text={snippet} query={query} />
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Avatar sx={{ width: 18, height: 18, fontSize: 10 }}>{post.author.name?.charAt(0)}</Avatar>
-            <Typography variant="caption" color="text.secondary">{post.author.name}</Typography>
+            <Avatar sx={{ width: 18, height: 18, fontSize: 10 }}>
+              {post.author.name?.charAt(0)}
+            </Avatar>
+            <Typography variant="caption" color="text.secondary">
+              {post.author.name}
+            </Typography>
           </Box>
-          <Typography variant="caption" color="text.disabled">{new Date(post.createdAt).toLocaleDateString()}</Typography>
-          <Typography variant="caption" color="text.disabled">{post.voteCount} votes · {post.commentCount} comments</Typography>
+          <Typography variant="caption" color="text.disabled">
+            {new Date(post.createdAt).toLocaleDateString()}
+          </Typography>
+          <Typography variant="caption" color="text.disabled">
+            {post.voteCount} votes · {post.commentCount} comments
+          </Typography>
         </Box>
       </CardContent>
     </Card>
@@ -464,11 +611,11 @@ const PostCard: FC<{ post: PostResult; query: string; onClick: (id: string) => v
 // ──────────────────────────────────────────────────────────────
 // User Card
 // ──────────────────────────────────────────────────────────────
-const UserCard: FC<{ user: UserResult; query: string; onClick: (id: string) => void }> = ({
-  user,
-  query,
-  onClick,
-}) => {
+const UserCard: FC<{
+  user: UserResult;
+  query: string;
+  onClick: (id: string) => void;
+}> = ({ user, query, onClick }) => {
   const navigate = useNavigate();
   const handleClick = () => {
     onClick(user.id);
@@ -477,21 +624,34 @@ const UserCard: FC<{ user: UserResult; query: string; onClick: (id: string) => v
   return (
     <Card
       variant="outlined"
-      sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s', borderRadius: 2 }}
+      sx={{
+        cursor: 'pointer',
+        '&:hover': { boxShadow: 3 },
+        transition: 'box-shadow 0.2s',
+        borderRadius: 2,
+      }}
       onClick={handleClick}
     >
       <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <Avatar src={user.avatarUrl} sx={{ width: 40, height: 40 }}>{user.name?.charAt(0)}</Avatar>
+          <Avatar src={user.avatarUrl} sx={{ width: 40, height: 40 }}>
+            {user.name?.charAt(0)}
+          </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="subtitle2" fontWeight={600} noWrap>
               <Highlight text={user.name} query={query} />
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
-              {user.role}{user.location ? ` · ${user.location}` : ''}
+              {user.role}
+              {user.location ? ` · ${user.location}` : ''}
             </Typography>
             {user.bio && (
-              <Typography variant="caption" color="text.disabled" display="block" noWrap>
+              <Typography
+                variant="caption"
+                color="text.disabled"
+                display="block"
+                noWrap
+              >
                 <Highlight text={user.bio} query={query} />
               </Typography>
             )}
@@ -505,11 +665,11 @@ const UserCard: FC<{ user: UserResult; query: string; onClick: (id: string) => v
 // ──────────────────────────────────────────────────────────────
 // Community Card
 // ──────────────────────────────────────────────────────────────
-const CommunityCard: FC<{ community: CommunityResult; query: string; onClick: (id: string) => void }> = ({
-  community,
-  query,
-  onClick,
-}) => {
+const CommunityCard: FC<{
+  community: CommunityResult;
+  query: string;
+  onClick: (id: string) => void;
+}> = ({ community, query, onClick }) => {
   const navigate = useNavigate();
   const handleClick = () => {
     onClick(community.id);
@@ -518,25 +678,52 @@ const CommunityCard: FC<{ community: CommunityResult; query: string; onClick: (i
   return (
     <Card
       variant="outlined"
-      sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s', borderRadius: 2 }}
+      sx={{
+        cursor: 'pointer',
+        '&:hover': { boxShadow: 3 },
+        transition: 'box-shadow 0.2s',
+        borderRadius: 2,
+      }}
       onClick={handleClick}
     >
       <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 0.5,
+          }}
+        >
           <Typography variant="subtitle2" fontWeight={600}>
             <Highlight text={community.name} query={query} />
           </Typography>
           <Tooltip title={community.isPrivate ? 'Private' : 'Public'}>
-            {community.isPrivate ? <Lock fontSize="small" color="action" /> : <LockOpen fontSize="small" color="action" />}
+            {community.isPrivate ? (
+              <Lock fontSize="small" color="action" />
+            ) : (
+              <LockOpen fontSize="small" color="action" />
+            )}
           </Tooltip>
         </Box>
         {community.description && (
-          <Typography variant="body2" color="text.secondary" mb={0.5} sx={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            mb={0.5}
+            sx={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
             <Highlight text={community.description} query={query} />
           </Typography>
         )}
         <Typography variant="caption" color="text.disabled">
-          {community.memberCount.toLocaleString()} member{community.memberCount !== 1 ? 's' : ''}
+          {community.memberCount.toLocaleString()} member
+          {community.memberCount !== 1 ? 's' : ''}
         </Typography>
       </CardContent>
     </Card>

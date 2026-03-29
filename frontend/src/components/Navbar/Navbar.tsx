@@ -186,7 +186,9 @@ const Navbar: FC = () => {
         )}
 
         {/* Right side - Actions and User Menu */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+        >
           {user ? (
             <>
               <Tooltip title="Account" placement="bottom">
