@@ -35,6 +35,7 @@ import { ExportModule } from './export/export.module';
 import { TrendingModule } from './trending/trending.module';
 import { QueueModule } from './queue/queue.module';
 import { TrendingTopicsModule } from './trending/trending-topics.module';
+import { SearchModule } from './search/search.module';
 import { securityConfig } from './common/config/security.config';
 import { envValidationSchema } from './common/config/env.validation';
 import { WinstonLoggerService } from './common/logger/winston-logger.service';
@@ -98,6 +99,7 @@ import { FrontendErrorController } from './common/controllers/frontend-error.con
     TrendingModule,
     QueueModule,
     TrendingTopicsModule,
+    SearchModule,
   ],
   controllers: [AppController, FrontendErrorController],
   providers: [

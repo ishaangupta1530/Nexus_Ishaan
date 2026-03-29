@@ -15,7 +15,6 @@ import {
   Button,
   Stack,
   Paper,
-  IconButton,
   Grid,
   Badge,
   List,
@@ -23,8 +22,9 @@ import {
   ListItemText,
   Divider,
 } from '@mui/material';
-import { Close, Search, FilterList } from '@mui/icons-material';
+import { Close, FilterList } from '@mui/icons-material';
 import { AnimatePresence, motion } from 'framer-motion';
+import GlobalSearchBar from '../Search/GlobalSearchBar';
 
 interface ProjectFilterProps {
   filters: FilterProjectInterface;
@@ -55,15 +55,10 @@ const ProjectFilter: FC<ProjectFilterProps> = ({
     setExpanded(false);
   };
 
-  // Helper for Apply button near search field
-  const applyFromSearch = () => {
-    onFilterChange({ ...localFilters, cursor: undefined });
-  };
-
-  // Search updates local state only; applying happens when user clicks Apply
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setLocalFilters((prev) => ({ ...prev, search: value, cursor: undefined }));
+  const handleGlobalSearch = (value: string) => {
+    const nextFilters = { ...localFilters, search: value, cursor: undefined };
+    setLocalFilters(nextFilters);
+    onFilterChange(nextFilters);
   };
 
   const handleClearSearch = () => {
@@ -194,39 +189,13 @@ const ProjectFilter: FC<ProjectFilterProps> = ({
 
         <Grid item xs>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <TextField
-              label="Search projects..."
-              value={localFilters.search || ''}
-              onChange={handleSearchChange}
-              fullWidth
-              size="small"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') applyFromSearch();
-              }}
-              InputProps={{
-                startAdornment: (
-                  <Search sx={{ color: 'text.secondary', mr: 1 }} />
-                ),
-                endAdornment: (
-                  <IconButton
-                    size="small"
-                    onClick={handleClearSearch}
-                    aria-label="clear-search"
-                  >
-                    <Close fontSize="small" />
-                  </IconButton>
-                ),
-              }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            <GlobalSearchBar
+              variant="default"
+              placeholder="Search projects..."
+              onSearch={handleGlobalSearch}
             />
-
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={applyFromSearch}
-              sx={{ whiteSpace: 'nowrap' }}
-            >
-              Apply
+            <Button variant="outlined" onClick={handleClearSearch} sx={{ whiteSpace: 'nowrap' }}>
+              Clear
             </Button>
           </Box>
 

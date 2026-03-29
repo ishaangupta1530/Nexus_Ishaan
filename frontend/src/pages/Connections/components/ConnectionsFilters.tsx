@@ -1,16 +1,14 @@
-import { Search as SearchIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
   FormControl,
-  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  TextField,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
+import GlobalSearchBar from '@/components/Search/GlobalSearchBar';
 
 interface ConnectionsFiltersProps {
   searchTerm: string;
@@ -21,7 +19,7 @@ interface ConnectionsFiltersProps {
 }
 
 const ConnectionsFilters = ({
-  searchTerm,
+  searchTerm: _searchTerm,
   roleFilter,
   onSearchTermChange,
   onRoleFilterChange,
@@ -34,20 +32,13 @@ const ConnectionsFilters = ({
         spacing={2}
         alignItems={{ xs: 'stretch', sm: 'center' }}
       >
-        <TextField
-          fullWidth
-          placeholder="Search connections..."
-          value={searchTerm}
-          onChange={(e) => onSearchTermChange(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ maxWidth: 400 }}
-        />
+        <Box sx={{ width: '100%', maxWidth: 400 }}>
+          <GlobalSearchBar
+            variant="default"
+            placeholder="Search connections..."
+            onSearch={onSearchTermChange}
+          />
+        </Box>
         <FormControl sx={{ minWidth: { xs: '100%', sm: 140 } }}>
           <InputLabel>Role</InputLabel>
           <Select value={roleFilter} label="Role" onChange={onRoleFilterChange}>

@@ -25,6 +25,7 @@ import { SubCommunityCard } from '../../components/SubCommunity/SubCommunityCard
 import { SubCommunity } from '../../types/subCommunity';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { SubCommunityRequestDialog } from '@/components/SubCommunity/SubCommunityRequestDialog';
+import GlobalSearchBar from '@/components/Search/GlobalSearchBar';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -408,6 +409,17 @@ const MySubCommunityPage: FC = () => {
 
       {/* Search Communities */}
       <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 1.5 }}>
+          <GlobalSearchBar
+            variant="default"
+            placeholder="Search my communities..."
+            onSearch={(value) => {
+              setSearch(value);
+              applySuggestion(value);
+            }}
+          />
+        </Box>
+
         <Autocomplete
           freeSolo
           fullWidth

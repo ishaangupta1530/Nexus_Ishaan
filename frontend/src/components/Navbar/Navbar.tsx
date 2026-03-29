@@ -46,6 +46,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTheme as useAppTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavbar } from '../../contexts/NavbarContext';
+import GlobalSearchBar from '../Search/GlobalSearchBar';
 // import NavbarToggle from './NavbarToggle';
 
 const Navbar: FC = () => {
@@ -101,9 +102,9 @@ const Navbar: FC = () => {
         boxShadow: '0 2px 12px rgba(2,8,23,0.08)',
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
+      <Toolbar sx={{ justifyContent: 'space-between', gap: 2 }}>
         {/* Left side - Logo and Navigation */}
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
           <Box
             component={Link}
             to="/"
@@ -171,8 +172,21 @@ const Navbar: FC = () => {
           )}
         </Box>
 
+        {user && (
+          <Box
+            sx={{
+              flex: 1,
+              maxWidth: 420,
+              minWidth: 220,
+              display: { xs: 'none', lg: 'block' },
+            }}
+          >
+            <GlobalSearchBar variant="light" />
+          </Box>
+        )}
+
         {/* Right side - Actions and User Menu */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           {user ? (
             <>
               <Tooltip title="Account" placement="bottom">

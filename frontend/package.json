@@ -45,6 +45,7 @@
     "lucide-react": "^0.553.0",
     "mini-svg-data-uri": "^1.4.4",
     "mui-tiptap": "^1.28.1",
+    "nexus-backend": "file:../backend",
     "notistack": "^3.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -63,6 +64,8 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@floating-ui/react": "^0.27.19",
+    "@mui/styled-engine": "^7.3.9",
     "@tailwindcss/postcss": "^4.1.16",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",

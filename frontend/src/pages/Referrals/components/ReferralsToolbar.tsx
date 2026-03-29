@@ -8,11 +8,11 @@ import {
   MenuItem,
   Select,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import { Add, Refresh, RestartAlt } from '@mui/icons-material';
 import ExportButton from '@/components/Export/ExportButton';
+import GlobalSearchBar from '@/components/Search/GlobalSearchBar';
 
 interface ReferralsToolbarProps {
   userRole?: string;
@@ -47,7 +47,7 @@ export const ReferralsToolbar = ({
   analytics,
   referralStats,
   loading,
-  searchQuery,
+  searchQuery: _searchQuery,
   filterStatus,
   lastRefreshedAt,
   error,
@@ -155,7 +155,7 @@ export const ReferralsToolbar = ({
           exportType="REFERRALS"
           pageTitle="Referrals"
           filters={{
-            status: filterStatus !== 'ALL' ? filterStatus : undefined,
+            status: filterStatus === 'ALL' ? undefined : filterStatus,
           }}
           isCompact
         />
@@ -204,14 +204,13 @@ export const ReferralsToolbar = ({
           spacing={2}
           sx={{ width: '100%' }}
         >
-          <TextField
-            fullWidth
-            placeholder="Search referrals... (company, title, location)"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            size="small"
-            sx={{ maxWidth: { xs: '100%', sm: 420 } }}
-          />
+          <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 420 } }}>
+            <GlobalSearchBar
+              variant="default"
+              placeholder="Search referrals... (company, title, location)"
+              onSearch={onSearchChange}
+            />
+          </Box>
           <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 } }}>
             <InputLabel>Status</InputLabel>
             <Select

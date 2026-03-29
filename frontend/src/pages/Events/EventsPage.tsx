@@ -8,14 +8,11 @@ import {
   Paper,
   ToggleButtonGroup,
   ToggleButton,
-  TextField,
-  InputAdornment,
   Chip,
   Stack,
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search,
   FilterList,
   ViewModule,
   ViewList,
@@ -23,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import EventCard from '@/components/Events/EventCard';
 import { useEventContext } from '@/contexts/eventContext';
+import GlobalSearchBar from '@/components/Search/GlobalSearchBar';
 
 type ViewMode = 'grid' | 'list';
 type FilterType = 'all' | 'upcoming' | 'past' | 'today';
@@ -129,24 +127,10 @@ const EventsPage: FC = () => {
         <Grid container spacing={3} alignItems="center">
           {/* Search */}
           <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
+            <GlobalSearchBar
+              variant="default"
               placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search color="primary" />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 3,
-                  backgroundColor: 'background.paper',
-                },
-              }}
+              onSearch={setSearchQuery}
             />
           </Grid>
 
@@ -216,7 +200,7 @@ const EventsPage: FC = () => {
         }}
       >
         <Typography variant="h6" fontWeight={600}>
-          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}{' '}
+          {filteredEvents.length} event{filteredEvents.length === 1 ? '' : 's'}{' '}
           found
         </Typography>
         <Typography variant="body2" color="text.secondary">

@@ -1346,3 +1346,16 @@ model SharedExport {
   @@index([expiresAt])
   @@map("shared_exports")
 }
+
+model SearchQuery {
+  id             String   @id @default(cuid())
+  userId         String?
+  query          String
+  resultCount    Int      @default(0)
+  clickedResults String[]
+  createdAt      DateTime @default(now())
+
+  @@index([query, createdAt])
+  @@index([userId, createdAt])
+  @@map("search_queries")
+}
