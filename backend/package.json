@@ -37,7 +37,7 @@
     "perf:spike": "k6 run --out json=load-tests/results/spike-results.json -e BASE_URL=http://localhost:3000 load-tests/k6-spike-test.js",
     "perf:soak": "k6 run --out json=load-tests/results/soak-results.json -e BASE_URL=http://localhost:3000 load-tests/k6-soak-test.js",
     "perf:all": "npm run perf:test && npm run perf:spike",
-    "postinstall": "npx --no-install prisma generate"
+    "postinstall": "prisma generate || node -e \"console.log('Skipping prisma generate during postinstall')\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.916.0",
