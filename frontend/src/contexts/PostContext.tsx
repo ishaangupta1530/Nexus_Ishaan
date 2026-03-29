@@ -24,6 +24,7 @@ import {
   getPostStatsService,
   getPostCommentsService,
   createCommentService,
+  refreshDiscoveryFeedService,
 } from '../services/PostService';
 import { getErrorMessage } from '@/utils/errorHandler';
 
@@ -78,6 +79,7 @@ interface PostContextType {
     limit?: number,
     scope?: 'all' | 'following'
   ) => Promise<void>;
+  refreshDiscoveryFeed: () => Promise<void>;
   getCommunityFeed: (
     page?: number,
     limit?: number,
@@ -332,6 +334,37 @@ const PostProvider: FC<{ children: ReactNode }> = ({ children }) => {
     },
     [user, clearError, mergeUniquePosts, normalizePagination]
   );
+
+  const refreshDiscoveryFeed = useCallback(async () => {
+    if (!user || user.role === 'ADMIN') return;
+
+    try {
+      setLoading(true);
+      clearError();
+
+      const response = await refreshDiscoveryFeedService();
+      const posts = response.posts || [];
+      const paginationData = response.pagination || {
+        page: 1,
+        limit: 20,
+        total: posts.length,
+        totalPages: Math.ceil(posts.length / 20),
+        hasNext: false,
+        hasPrev: false,
+      };
+
+      setFeed(posts);
+      setPagination(
+        normalizePagination(paginationData, 1, 20, posts.length)
+      );
+      setLoading(false);
+    } catch (err) {
+      const errorMessage = getErrorMessage(err);
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, [user, clearError, normalizePagination]);
 
   const getSubCommunityFeed = useCallback(
     async (subCommunityId: string, page = 1, limit = 10) => {
@@ -724,6 +757,7 @@ const PostProvider: FC<{ children: ReactNode }> = ({ children }) => {
         getPostComments,
         createComment,
         getFeed,
+        refreshDiscoveryFeed,
         getCommunityFeed,
         getSubCommunityFeed,
         getUserPosts,

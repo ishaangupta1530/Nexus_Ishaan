@@ -120,7 +120,14 @@ const CreatePostForm = lazy(() =>
 const FeedPage: FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { getFeed, getCommunityFeed, loading, error, clearError } = usePosts();
+  const {
+    getFeed,
+    getCommunityFeed,
+    refreshDiscoveryFeed,
+    loading,
+    error,
+    clearError,
+  } = usePosts();
   const { showNotification } = useNotification();
   const { user } = useAuth();
   const { profile, refreshProfile } = useProfile();
@@ -302,8 +309,23 @@ const FeedPage: FC = () => {
   const handleCreatePostSuccess = useCallback(() => {
     setOpenForm(false);
     showSnackbar('Post created successfully and sent for approval!', 'success');
-    void loadTabPage(activeTab, 1, false, true);
-  }, [activeTab, loadTabPage, showSnackbar]);
+    void (async () => {
+      if (activeTab === 'all' && user?.role !== 'ADMIN') {
+        await refreshDiscoveryFeed();
+      }
+      await loadTabPage(activeTab, 1, false, true);
+    })();
+  }, [activeTab, loadTabPage, refreshDiscoveryFeed, showSnackbar, user?.role]);
+
+  const handleRefreshFeed = useCallback(() => {
+    void (async () => {
+      if (activeTab === 'all' && user?.role !== 'ADMIN') {
+        await refreshDiscoveryFeed();
+      }
+      await loadTabPage(activeTab, 1, false, true);
+      showSnackbar('Feed refreshed', 'success');
+    })();
+  }, [activeTab, loadTabPage, refreshDiscoveryFeed, showSnackbar, user?.role]);
 
   const handleCreatePostError = useCallback(
     (error: unknown) => {
@@ -454,13 +476,23 @@ const FeedPage: FC = () => {
                       Latest posts from your network and communities
                     </Typography>
                   </Box>
-                  {!isMobile && (
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={`${currentFeed.length} post${currentFeed.length === 1 ? '' : 's'}`}
-                    />
-                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {!isMobile && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`${currentFeed.length} post${currentFeed.length === 1 ? '' : 's'}`}
+                      />
+                    )}
+                    <Button
+                      variant="text"
+                      onClick={handleRefreshFeed}
+                      size={isMobile ? 'small' : 'medium'}
+                      disabled={loading || isTabLoading}
+                    >
+                      Refresh Feed
+                    </Button>
+                  </Box>
                 </Box>
 
                 <Tabs
