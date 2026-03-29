@@ -128,7 +128,7 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
         navigate(`/search?q=${encodeURIComponent(trimmed)}`);
       }
     },
-    [navigate, onSearch]
+    [navigate, onSearch],
   );
 
   const allItems = [
@@ -192,20 +192,14 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
           py: 0.5,
           transition: 'background 0.2s',
           '&:hover': {
-            bgcolor: isLight
-              ? 'rgba(255,255,255,0.22)'
-              : theme.palette.action.selected,
+            bgcolor: isLight ? 'rgba(255,255,255,0.22)' : theme.palette.action.selected,
           },
           ...(open && {
-            bgcolor: isLight
-              ? 'rgba(255,255,255,0.25)'
-              : theme.palette.action.selected,
+            bgcolor: isLight ? 'rgba(255,255,255,0.25)' : theme.palette.action.selected,
           }),
         }}
       >
-        <SearchIcon
-          sx={{ color: inputPlaceholderColor, mr: 1, fontSize: 20 }}
-        />
+        <SearchIcon sx={{ color: inputPlaceholderColor, mr: 1, fontSize: 20 }} />
         <InputBase
           inputRef={inputRef}
           value={query}
@@ -213,12 +207,7 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          inputProps={{
-            'aria-label': 'global search',
-            role: 'combobox',
-            'aria-expanded': open,
-            'aria-autocomplete': 'list',
-          }}
+          inputProps={{ 'aria-label': 'global search', role: 'combobox', 'aria-expanded': open, 'aria-autocomplete': 'list' }}
           sx={{
             color: inputColor,
             flex: 1,
@@ -228,10 +217,7 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
           }}
         />
         {loading && (
-          <CircularProgress
-            size={16}
-            sx={{ color: inputPlaceholderColor, ml: 1 }}
-          />
+          <CircularProgress size={16} sx={{ color: inputPlaceholderColor, ml: 1 }} />
         )}
       </Box>
 
@@ -257,11 +243,7 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
             {suggestions.length > 0 && (
               <>
                 <ListItem sx={{ py: 0.5, px: 2 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    fontWeight={600}
-                  >
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
                     SUGGESTIONS
                   </Typography>
                 </ListItem>
@@ -274,12 +256,14 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
                       role="option"
                       aria-selected={highlighted === i}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <SearchIcon fontSize="small" color="action" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={<HighlightedText text={s} highlight={query} />}
-                      />
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <SearchIcon fontSize="small" color="action" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <HighlightedText text={s} highlight={query} />
+                      }
+                    />
                     </ListItemButton>
                   </ListItem>
                 ))}
@@ -293,11 +277,7 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
                   <>
                     <Divider />
                     <ListItem sx={{ py: 0.5, px: 2 }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        fontWeight={600}
-                      >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
                         RECENT
                       </Typography>
                     </ListItem>
@@ -310,10 +290,10 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
                             onClick={() => navigateToSearch(r)}
                             sx={{ py: 0.75, px: 2 }}
                           >
-                            <ListItemIcon sx={{ minWidth: 32 }}>
-                              <History fontSize="small" color="action" />
-                            </ListItemIcon>
-                            <ListItemText primary={r} />
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <History fontSize="small" color="action" />
+                          </ListItemIcon>
+                          <ListItemText primary={r} />
                           </ListItemButton>
                         </ListItem>
                       );
@@ -328,23 +308,11 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
                       <ListItemIcon sx={{ minWidth: 28 }}>
                         <TrendingUp fontSize="small" color="primary" />
                       </ListItemIcon>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        fontWeight={600}
-                      >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
                         TRENDING
                       </Typography>
                     </ListItem>
-                    <Box
-                      sx={{
-                        px: 2,
-                        pb: 1,
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 0.5,
-                      }}
-                    >
+                    <Box sx={{ px: 2, pb: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {trending.map((t) => (
                         <Chip
                           key={t}
@@ -364,15 +332,13 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
             )}
 
             {/* Quick type badges when typing */}
-            {debouncedQuery.length > 0 &&
-              suggestions.length === 0 &&
-              !loading && (
-                <ListItem sx={{ py: 1, px: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Press Enter to search for &ldquo;{query}&rdquo;
-                  </Typography>
-                </ListItem>
-              )}
+            {debouncedQuery.length > 0 && suggestions.length === 0 && !loading && (
+              <ListItem sx={{ py: 1, px: 2 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Press Enter to search for &ldquo;{query}&rdquo;
+                </Typography>
+              </ListItem>
+            )}
 
             {/* Type shortcuts */}
             {debouncedQuery.length > 1 && (
@@ -383,21 +349,9 @@ const GlobalSearchBar: FC<GlobalSearchBarProps> = ({
                     Search in:
                   </Typography>
                   {[
-                    {
-                      type: 'posts',
-                      icon: <Tag sx={{ fontSize: 12 }} />,
-                      label: 'Posts',
-                    },
-                    {
-                      type: 'users',
-                      icon: <Person sx={{ fontSize: 12 }} />,
-                      label: 'People',
-                    },
-                    {
-                      type: 'communities',
-                      icon: <Group sx={{ fontSize: 12 }} />,
-                      label: 'Communities',
-                    },
+                    { type: 'posts', icon: <Tag sx={{ fontSize: 12 }} />, label: 'Posts' },
+                    { type: 'users', icon: <Person sx={{ fontSize: 12 }} />, label: 'People' },
+                    { type: 'communities', icon: <Group sx={{ fontSize: 12 }} />, label: 'Communities' },
                   ].map(({ type, icon, label }) => (
                     <Chip
                       key={type}

@@ -113,11 +113,15 @@ export async function getFeedService(
   scope: 'all' | 'following' = 'all'
 ) {
   try {
-    const { data } = await api.get('/posts/feed', {
+    const user = getUser();
+    const isDiscoveryFeed = scope === 'all' && user?.role !== 'ADMIN';
+    const endpoint = isDiscoveryFeed ? '/discovery/feed' : '/posts/feed';
+
+    const { data } = await api.get(endpoint, {
       params: {
         page,
         limit,
-        scope,
+        ...(isDiscoveryFeed ? {} : { scope }),
       },
     });
     return data;
@@ -126,6 +130,20 @@ export async function getFeedService(
       throw new Error(err.response?.data?.message || 'Failed to fetch feed');
     }
     throw new Error('Failed to fetch feed');
+  }
+}
+
+export async function refreshDiscoveryFeedService() {
+  try {
+    const { data } = await api.post('/discovery/feed/refresh');
+    return data;
+  } catch (err) {
+    if (isAxiosError(err)) {
+      throw new Error(
+        err.response?.data?.message || 'Failed to refresh personalized feed'
+      );
+    }
+    throw new Error('Failed to refresh personalized feed');
   }
 }
 
