@@ -15,7 +15,7 @@ import {
   Fade,
   Autocomplete,
   TextField,
-  InputAdornment,ba
+  InputAdornment,
 } from '@mui/material';
 import { Add, Search } from '@mui/icons-material';
 import { useSubCommunity } from '../../contexts/SubCommunityContext';
