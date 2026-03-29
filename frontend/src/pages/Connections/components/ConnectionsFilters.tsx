@@ -19,7 +19,6 @@ interface ConnectionsFiltersProps {
 }
 
 const ConnectionsFilters = ({
-  searchTerm: _searchTerm,
   roleFilter,
   onSearchTermChange,
   onRoleFilterChange,

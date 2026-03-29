@@ -47,7 +47,6 @@ export const ReferralsToolbar = ({
   analytics,
   referralStats,
   loading,
-  searchQuery: _searchQuery,
   filterStatus,
   lastRefreshedAt,
   error,
