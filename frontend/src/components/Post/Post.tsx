@@ -2,6 +2,7 @@ import { CSSProperties, FC, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePosts } from '../../contexts/PostContext';
 import { useEngagement } from '../../contexts/engagementContext';
+import { trackFeedInteractionService } from '../../services/PostService';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Card,
@@ -163,6 +164,9 @@ export const Post: FC<PostProps> = ({
         post.id,
         newIsLiked ? VoteType.UPVOTE : VoteType.DOWNVOTE
       );
+
+      // Track the feed interaction asynchronously
+      trackFeedInteractionService(post.id);
     } catch (error) {
       console.error('Error voting on post:', error);
       // Revert UI state on error

@@ -24,13 +24,17 @@ import { CreateSubCommunityDto } from './dto/create-sub-community.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { UpdateReportDto } from '../report/dto/update-report.dto';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('sub-community')
 @ApiBearerAuth('JWT')
 @Controller('sub-community')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SubCommunityController {
-  constructor(private readonly subCommunityService: SubCommunityService) {}
+  constructor(
+    private readonly subCommunityService: SubCommunityService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // --- SubCommunity CRUD Endpoints ---
 
@@ -72,7 +76,28 @@ export class SubCommunityController {
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyOwnedSubCommunities(userId, p, l, q);
+    const result = await this.subCommunityService.findMyOwnedSubCommunities(
+      userId,
+      p,
+      l,
+      q,
+    );
+
+    const trimmed = q?.trim();
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount: result.owned?.pagination?.total || result.owned?.data?.length || 0,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   @Get('my/moderated')
@@ -84,7 +109,29 @@ export class SubCommunityController {
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyModeratedSubCommunities(userId, p, l, q);
+    const result = await this.subCommunityService.findMyModeratedSubCommunities(
+      userId,
+      p,
+      l,
+      q,
+    );
+
+    const trimmed = q?.trim();
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount:
+              result.moderated?.pagination?.total || result.moderated?.data?.length || 0,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   @Get('my/member')
@@ -96,7 +143,28 @@ export class SubCommunityController {
   ) {
     const p = page ? Number(page) : 1;
     const l = limit ? Number(limit) : 6;
-    return this.subCommunityService.findMyMemberSubCommunities(userId, p, l, q);
+    const result = await this.subCommunityService.findMyMemberSubCommunities(
+      userId,
+      p,
+      l,
+      q,
+    );
+
+    const trimmed = q?.trim();
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount: result.member?.pagination?.total || result.member?.data?.length || 0,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   @Get(':id')
@@ -113,7 +181,7 @@ export class SubCommunityController {
     @Query() filterDto: FilterSubCommunityDto,
     @GetCurrentUser('userId') userId: string,
   ) {
-    return this.subCommunityService.findSubCommunityByType(type, {
+    const result = await this.subCommunityService.findSubCommunityByType(type, {
       q: filterDto.q,
       page: filterDto.page,
       limit: filterDto.limit,
@@ -123,6 +191,22 @@ export class SubCommunityController {
       sort: filterDto.sort,
       minMembers: filterDto.minMembers,
     });
+
+    const trimmed = filterDto.q?.trim();
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount: result.pagination?.total || result.data?.length || 0,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   @Patch(':id')

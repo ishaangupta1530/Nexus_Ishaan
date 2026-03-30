@@ -17,6 +17,7 @@ import { Role } from '@prisma/client';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetCurrentUser } from 'src/common/decorators/get-current-user.decorator';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 /**
  * Controller for handling user-related requests.
@@ -27,7 +28,10 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @ApiBearerAuth('JWT')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Retrieves all users. Requires ADMIN role.
@@ -45,8 +49,27 @@ export class UserController {
    * @returns A promise that resolves to an array of matching users.
    */
   @Get('search')
-  searchUsers(@Query('q') query: string) {
-    return this.userService.searchUsers(query);
+  async searchUsers(
+    @Query('q') query: string,
+    @GetCurrentUser('userId') userId?: string,
+  ) {
+    const users = await this.userService.searchUsers(query);
+    const trimmed = query?.trim();
+
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount: users.length,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return users;
   }
 
   /**

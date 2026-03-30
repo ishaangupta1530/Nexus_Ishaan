@@ -19,6 +19,7 @@ import {
 } from './dto/connection.dto';
 import { ImprovedMessagingGateway } from '../messaging/messaging.gateway.improved';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 /**
  * Controller for managing user connections (friend requests, accepted connections).
@@ -32,6 +33,7 @@ export class ConnectionController {
   constructor(
     private readonly connectionService: ConnectionService,
     private readonly messagingGateway: ImprovedMessagingGateway,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -111,14 +113,30 @@ export class ConnectionController {
    * @returns A promise that resolves to an object containing connections and pagination details.
    */
   @Get()
-  getConnections(@Query() query: ConnectionQueryDto, @Req() req) {
-    return this.connectionService.getConnections(
+  async getConnections(@Query() query: ConnectionQueryDto, @Req() req) {
+    const result = await this.connectionService.getConnections(
       req.user.userId,
       query.page,
       query.limit,
       query.role,
       query.search,
     );
+
+    const trimmed = query.search?.trim();
+    if (trimmed && trimmed.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: trimmed,
+            resultCount: result.pagination?.total || result.connections?.length || 0,
+            clickedResults: [],
+            userId: req.user.userId,
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   /**

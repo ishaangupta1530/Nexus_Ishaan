@@ -182,8 +182,16 @@ export class QueueService {
           (counts.delayed || 0),
       };
     } catch (error) {
-      this.logger.error(`Failed to get export queue stats: ${error.message}`);
-      throw error;
+      this.logger.warn(`Export queue stats unavailable (Redis unreachable?): ${error.message}`);
+      return {
+        queue: EXPORT_QUEUE_NAME,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        total: 0,
+      };
     }
   }
 
@@ -228,8 +236,16 @@ export class QueueService {
           (counts.delayed || 0),
       };
     } catch (error) {
-      this.logger.error(`Failed to get reports queue stats: ${error.message}`);
-      throw error;
+      this.logger.warn(`Reports queue stats unavailable (Redis unreachable?): ${error.message}`);
+      return {
+        queue: REPORTS_QUEUE_NAME,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        total: 0,
+      };
     }
   }
 

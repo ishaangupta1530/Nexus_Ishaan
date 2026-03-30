@@ -118,8 +118,12 @@ export class SearchService {
       `Search "${trimmed}" (${type}) in ${Date.now() - startedAt}ms - ${primaryTotal} results`,
     );
 
-    this.trackSearch(trimmed, primaryTotal, userId).catch(() => {
-      // ignore analytics tracking failures
+    this.trackSearch(trimmed, primaryTotal, userId).catch((err: unknown) => {
+      this.logger.error(
+        `Failed to track search "${trimmed}": ${
+          err instanceof Error ? err.message : 'unknown error'
+        }`,
+      );
     });
 
     return {
@@ -158,6 +162,14 @@ export class SearchService {
       suggestions = await this.buildSuggestions(trimmed);
       await this.cacheService.set(key, suggestions, SUGGEST_CACHE_TTL);
     }
+
+    this.trackSearch(trimmed, suggestions.length, userId).catch((err: unknown) => {
+      this.logger.error(
+        `Failed to track search suggestion "${trimmed}": ${
+          err instanceof Error ? err.message : 'unknown error'
+        }`,
+      );
+    });
 
     return {
       suggestions: suggestions.slice(0, 8),
