@@ -260,15 +260,6 @@ export class MonitoringService {
     startDate: Date,
     endDate: Date,
   ) {
-    const period =
-      aggregationType === 'hourly'
-        ? '1 hour'
-        : aggregationType === 'daily'
-          ? '1 day'
-          : aggregationType === 'weekly'
-            ? '1 week'
-            : '1 month';
-
     const algorithmMetrics = await this.prisma.algorithmPerformance.findMany({
       where: {
         recordedAt: {
