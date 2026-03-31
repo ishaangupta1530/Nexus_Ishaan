@@ -162,6 +162,74 @@ export interface TrendingScoreResponse {
   rank: number | null;
 }
 
+export interface TrendingPerformanceResponse {
+  period: string;
+  generatedAt: string;
+  clickThroughRate: number;
+  avgTimeSpentSeconds: number;
+  engagementRate: number;
+  totalImpressions: number;
+  totalClicks: number;
+  algorithmExecutionTimeMs: number;
+  cacheHitRate: number;
+  cacheMissRate: number;
+}
+
+export interface RecommendationsStatsResponse {
+  generatedAt: string;
+  period: {
+    days: number;
+    startDate: string;
+    endDate: string;
+  };
+  totalRecommendationsServed: number;
+  acceptedRecommendations: number;
+  acceptanceRate: number;
+  trend: Array<{ date: string; accepted: number }>;
+  notes?: {
+    source?: string;
+    telemetryMode?: string;
+  };
+}
+
+export interface SearchTrendsResponse {
+  generatedAt: string;
+  totalSearches: number;
+  successfulSearches: number;
+  successRate: number;
+  topQueries: Array<{ query: string; count: number; successRate: number }>;
+  trend: Array<{ date: string; searches: number; successfulSearches: number }>;
+}
+
+export interface FeedEngagementResponse {
+  generatedAt: string;
+  period: string;
+  avgScrollDepthPercent: number;
+  avgTimeOnFeedSeconds: number;
+  feedClickThroughRate: number;
+  totalFeedSessions: number;
+  returnVisitRate: number;
+  jobQueueBacklog: number;
+  anomaliesDetected: number;
+}
+
+export interface QueueStats {
+  queue: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  total?: number;
+  error?: string;
+}
+
+export interface JobsHealthResponse {
+  status: string;
+  exportQueue: QueueStats;
+  reportsQueue: QueueStats;
+}
+
 const adminAnalyticsService = {
   getPlatformStats: (params: AdminAnalyticsQuery) =>
     api.get<PlatformStatsResponse>('/analytics/admin/platform-stats', {
@@ -190,6 +258,29 @@ const adminAnalyticsService = {
     }),
 
   recalculateTrending: () => api.post('/trending/recalculate'),
+
+  getTrendingPerformance: (period: TrendingPeriod = 'day') =>
+    api.get<TrendingPerformanceResponse>('/analytics/trending/performance', {
+      params: { period },
+    }),
+
+  getRecommendationsStats: (params: AdminAnalyticsQuery) =>
+    api.get<RecommendationsStatsResponse>(
+      '/analytics/discovery/recommendations-stats',
+      { params },
+    ),
+
+  getSearchTrends: (params: AdminAnalyticsQuery) =>
+    api.get<SearchTrendsResponse>('/analytics/discovery/search-trends', {
+      params,
+    }),
+
+  getFeedEngagement: (params: AdminAnalyticsQuery) =>
+    api.get<FeedEngagementResponse>('/analytics/discovery/feed-engagement', {
+      params,
+    }),
+
+  getJobsHealth: () => api.get<JobsHealthResponse>('/analytics/jobs/health'),
 };
 
 export default adminAnalyticsService;

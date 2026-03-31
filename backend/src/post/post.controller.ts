@@ -12,6 +12,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -31,6 +32,8 @@ import { GetCurrentUser } from 'src/common/decorators/get-current-user.decorator
 import { LegacyFilesService } from 'src/files/legacy-files.service';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { randomUUID } from 'crypto';
 
 /**
  * Controller for handling post-related operations.
@@ -42,9 +45,12 @@ import { Role } from '@prisma/client';
 @Controller('posts')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PostController {
+  private readonly logger = new Logger(PostController.name);
+
   constructor(
     private readonly postService: PostService,
     private readonly legacyFilesService: LegacyFilesService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -342,14 +348,147 @@ export class PostController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('subCommunityId') subCommunityId?: string,
+    @GetCurrentUser('userId') userId?: string,
   ) {
     const pageNum = page ?? 1;
     const limitNum = limit ?? 10;
-    return this.postService.searchPosts(
+    const trimmed = query?.trim();
+
+    const result = this.postService.searchPosts(
       query,
       pageNum,
       limitNum,
       subCommunityId,
     );
+
+    if (trimmed && trimmed.length >= 2) {
+      result
+        .then((payload) =>
+          this.prisma.searchQuery.create({
+            data: {
+              query: trimmed,
+              resultCount: payload.pagination?.total || payload.posts?.length || 0,
+              clickedResults: [],
+              ...(userId ? { userId } : {}),
+            },
+          }),
+        )
+        .catch(() => undefined);
+    }
+
+    return result;
+  }
+
+  /**
+   * Tracks feed session activity for analytics.
+   * Creates or updates a UserSession to record feed view time.
+   * This is called when users load/view the feed.
+   * @param userId - The ID of the current user (extracted from JWT).
+   * @returns HTTP 204 No Content (fire-and-forget).
+   */
+  @Post('feed-session/track')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Track feed session for analytics' })
+  @ApiResponse({ status: 204, description: 'Session tracked.' })
+  async trackFeedSession(
+    @GetCurrentUser('userId') userId: string,
+  ) {
+    // Record session asynchronously without blocking the response
+    setImmediate(async () => {
+      try {
+        const existingSession = await this.prisma.userSession.findFirst({
+          where: {
+            userId,
+            createdAt: {
+              gte: new Date(Date.now() - 60 * 60 * 1000),
+            },
+          },
+          orderBy: { lastActivity: 'desc' },
+        });
+
+        if (existingSession) {
+          await this.prisma.userSession.update({
+            where: { id: existingSession.id },
+            data: {
+              lastActivity: new Date(),
+              isActive: true,
+            },
+          });
+        } else {
+          await this.prisma.userSession.create({
+            data: {
+              userId,
+              sessionToken: randomUUID(),
+              ipAddress: 'unknown',
+              isActive: true,
+              lastActivity: new Date(),
+            },
+          });
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to track feed session for user ${userId}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
+    });
+
+    return;
+  }
+
+  /**
+   * Tracks a feed post interaction (click, like, etc.) for analytics.
+   * Records the interaction in SearchQuery for feed engagement metrics.
+   * @param postId - The ID of the post being interacted with.
+   * @param userId - The ID of the current user (extracted from JWT).
+   * @returns HTTP 204 No Content (fire-and-forget).
+   */
+  @Post(':postId/track-interaction')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Track a feed post interaction for analytics' })
+  @ApiParam({ name: 'postId', type: String })
+  @ApiResponse({ status: 204, description: 'Interaction tracked.' })
+  async trackFeedInteraction(
+    @Param('postId') postId: string,
+    @GetCurrentUser('userId') userId: string,
+  ) {
+    setImmediate(async () => {
+      try {
+        const existingRecord = await this.prisma.searchQuery.findFirst({
+          where: {
+            query: 'feed',
+            userId,
+            createdAt: {
+              gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (existingRecord) {
+          const updatedClicks = Array.from(
+            new Set([...existingRecord.clickedResults, postId]),
+          );
+          await this.prisma.searchQuery.update({
+            where: { id: existingRecord.id },
+            data: { clickedResults: updatedClicks },
+          });
+        } else {
+          await this.prisma.searchQuery.create({
+            data: {
+              query: 'feed',
+              resultCount: 1,
+              clickedResults: [postId],
+              userId,
+            },
+          });
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to track feed interaction for post ${postId}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
+    });
+
+    return;
   }
 }

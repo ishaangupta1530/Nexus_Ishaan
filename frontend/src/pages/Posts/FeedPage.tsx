@@ -34,6 +34,8 @@ import RecentNews from '@/components/News/RecentNews';
 import { getErrorMessage } from '@/utils/errorHandler';
 import { useNotification } from '@/contexts/NotificationContext';
 
+import { trackFeedSessionService } from '../../services/PostService';
+
 const FEED_FETCH_DEDUP_TTL_MS = 1500;
 const inFlightFeedFetches = new Set<string>();
 const recentProfileRefreshes = new Map<string, number>();
@@ -245,6 +247,21 @@ const FeedPage: FC = () => {
     },
     [showNotification]
   );
+
+  // Track feed session when user loads the feed
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Call feed session tracking on component mount
+    trackFeedSessionService();
+
+    // Also track periodically while user is viewing the feed (every 30 seconds)
+    const sessionTrackingInterval = setInterval(() => {
+      trackFeedSessionService();
+    }, 30000);
+
+    return () => clearInterval(sessionTrackingInterval);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;

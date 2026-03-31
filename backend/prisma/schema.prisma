@@ -1359,3 +1359,121 @@ model SearchQuery {
   @@index([userId, createdAt])
   @@map("search_queries")
 }
+
+// ============================================
+// ANALYTICS & MONITORING
+// ============================================
+
+model AlgorithmPerformance {
+  id                   String   @id @default(cuid())
+  metricType           String   // trending, discovery, search, feed
+  executionTimeMs      Int
+  cacheHitRate         Float    @default(0) // 0-1
+  cacheMissRate        Float    @default(0) // 0-1
+  clickThroughRate     Float    @default(0)
+  engagementRate       Float    @default(0)
+  conversionRate       Float    @default(0)
+  timeSpentSeconds     Float    @default(0)
+  anomalyDetected      Boolean  @default(false)
+  anomalyType          String?
+  anomalyScore         Float    @default(0)
+  period               String   // hour, day, week, month
+  recordedAt           DateTime @default(now())
+  metadata             Json?
+
+  @@index([metricType, recordedAt])
+  @@index([period, recordedAt])
+  @@index([anomalyDetected, recordedAt])
+  @@map("algorithm_performance")
+}
+
+model DiscoveryMetrics {
+  id                      String   @id @default(cuid())
+  recommendationsSent     Int      @default(0)
+  recommendationsAccepted Int      @default(0)
+  acceptanceRate          Float    @default(0)
+  searchQueries           Int      @default(0)
+  searchSuccessRate       Float    @default(0)
+  feedEngagementRate      Float    @default(0)
+  scrollDepthPercent      Float    @default(0)
+  returningVisitorRate    Float    @default(0)
+  period                  String   // hour, day, week, month
+  recordedAt              DateTime @default(now())
+  metadata                Json?
+
+  @@index([period, recordedAt])
+  @@map("discovery_metrics")
+}
+
+model SystemHealthAlert {
+  id              String   @id @default(cuid())
+  alertType       String   // cache_miss, queue_backlog, anomaly, performance_degradation
+  severity        String   // info, warning, critical
+  message         String
+  threshold       Float?
+  currentValue    Float?
+  metadata        Json?
+  acknowledged    Boolean  @default(false)
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  createdAt       DateTime @default(now())
+  resolvedAt      DateTime?
+
+  @@index([alertType, severity, createdAt])
+  @@index([acknowledged, createdAt])
+  @@map("system_health_alerts")
+}
+
+model QueueMetrics {
+  id              String   @id @default(cuid())
+  queueName       String   // exportQueue, reportsQueue
+  waitingCount    Int      @default(0)
+  delayedCount    Int      @default(0)
+  completedCount  Int      @default(0)
+  failedCount     Int      @default(0)
+  avgProcessTime  Float    @default(0) // in milliseconds
+  backlogHealth   String   // healthy, warning, critical
+  period          String   // hour, day, week
+  recordedAt      DateTime @default(now())
+  metadata        Json?
+
+  @@index([queueName, recordedAt])
+  @@index([backlogHealth, recordedAt])
+  @@map("queue_metrics")
+}
+
+model TrendingScoreLog {
+  id                String   @id @default(cuid())
+  contentId         String
+  contentType       String   // POST, COMMENT
+  score             Float
+  position          Int      // ranking position
+  userEngagements   Int      // upvotes + comments
+  impressions       Int      // estimated views
+  timeSpentSeconds  Float    @default(0)
+  clickCount        Int      @default(0)
+  period            String   // hour, day, week
+  calculatedAt      DateTime @default(now())
+  anomalyScore      Float    @default(0)
+  isAnomaly         Boolean  @default(false)
+
+  @@index([contentType, period, calculatedAt])
+  @@index([isAnomaly, calculatedAt])
+  @@map("trending_score_logs")
+}
+
+model AnalyticsAggregation {
+  id                String   @id @default(cuid())
+  aggregationType   String   // hourly, daily, weekly, monthly
+  metricsSnapshot   Json     // Aggregated metrics for the period
+  anomaliesCount    Int      @default(0)
+  alertsTriggered   Int      @default(0)
+  period            String
+  startDate         DateTime
+  endDate           DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([aggregationType, startDate, endDate])
+  @@index([createdAt])
+  @@map("analytics_aggregations")
+}

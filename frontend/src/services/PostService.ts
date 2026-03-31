@@ -425,3 +425,39 @@ export async function searchPostsService(
     throw new Error('Failed to search posts');
   }
 }
+
+/**
+ * Tracks a feed post interaction (click, like, etc.) for analytics.
+ * This is a fire-and-forget operation that doesn't block UI.
+ * @param postId - The ID of the post being interacted with
+ */
+export async function trackFeedInteractionService(postId: string): Promise<void> {
+  try {
+    // Fire-and-forget: don't wait for response
+    api.post(`/posts/${postId}/track-interaction`).catch(() => {
+      // Silently fail - don't block user experience
+      console.debug(`Failed to track interaction for post ${postId}`);
+    });
+  } catch {
+    // Silently fail at the try level too
+    console.debug(`Failed to track interaction for post ${postId}`);
+  }
+}
+
+/**
+ * Tracks a feed session (view) for analytics.
+ * This is called when users load/view the feed.
+ * Creates/updates UserSession for feed engagement time tracking.
+ */
+export async function trackFeedSessionService(): Promise<void> {
+  try {
+    // Fire-and-forget: don't wait for response
+    api.post('/posts/feed-session/track').catch(() => {
+      // Silently fail - don't block user experience
+      console.debug('Failed to track feed session');
+    });
+  } catch {
+    // Silently fail at the try level too
+    console.debug('Failed to track feed session');
+  }
+}

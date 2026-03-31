@@ -24,6 +24,7 @@ import { Role, ReferralStatus } from '@prisma/client';
 import { SkipThrottle } from '@nestjs/throttler';
 import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Controller for managing job referrals and referral applications.
@@ -34,7 +35,10 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @Controller('referral')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReferralController {
-  constructor(private readonly referralService: ReferralService) {}
+  constructor(
+    private readonly referralService: ReferralService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // Referral Endpoints
 
@@ -71,11 +75,31 @@ export class ReferralController {
   ) {
     // If user is not authenticated, userId and userRole will be undefined
     // Service will handle this and show only APPROVED referrals
-    return this.referralService.getFilteredReferrals(
+    const result = await this.referralService.getFilteredReferrals(
       filterDto,
       userId,
       userRole,
     );
+
+    const rawQuery = [filterDto.jobTitle, filterDto.company, filterDto.location]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ');
+
+    if (rawQuery.length >= 2) {
+      this.prisma.searchQuery
+        .create({
+          data: {
+            query: rawQuery,
+            resultCount: result.length,
+            clickedResults: [],
+            ...(userId ? { userId } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return result;
   }
 
   /**

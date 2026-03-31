@@ -49,6 +49,10 @@ import adminAnalyticsService, {
   type ModerationQueueResponse,
   type TrendingPostsResponse,
   type TrendingPeriod,
+  type TrendingPerformanceResponse,
+  type SearchTrendsResponse,
+  type FeedEngagementResponse,
+  type JobsHealthResponse,
 } from '@/services/adminAnalyticsService';
 import ConnectionGrowthChart from '@/components/Analytics/Connections/ConnectionGrowthChart';
 import ConnectionDistributionChart from '@/components/Analytics/Connections/ConnectionDistributionChart';
@@ -131,6 +135,10 @@ const METRIC_OPTIONS_BY_TAB: Record<
   trending: [
     { key: 'trending.summary', label: 'Trending Summary' },
     { key: 'trending.list', label: 'Trending Leaderboard' },
+    { key: 'trending.performance', label: 'Algorithm Performance' },
+    { key: 'trending.search', label: 'Search Trends' },
+    { key: 'trending.feed', label: 'Feed Engagement' },
+    { key: 'trending.jobs', label: 'Job Health' },
   ],
 };
 
@@ -146,7 +154,7 @@ const MOBILE_PRIORITIZED_METRICS: Record<TabType, string[]> = {
   engagement: ['engagement.summary', 'engagement.timeline'],
   referrals: ['referrals.metrics', 'referrals.success'],
   platform: ['platform.overview', 'platform.moderation'],
-  trending: ['trending.summary', 'trending.list'],
+  trending: ['trending.summary', 'trending.list', 'trending.performance'],
 };
 
 const resolveDaysFromTimePeriod = (period: TimePeriodValue): number => {
@@ -208,6 +216,7 @@ const AdminAnalyticsPage: FC = () => {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialSearchParamsRef = useRef(searchParams);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>(
@@ -299,6 +308,13 @@ const AdminAnalyticsPage: FC = () => {
   );
   const [trendingData, setTrendingData] =
     useState<TrendingPostsResponse | null>(null);
+  const [trendingPerformance, setTrendingPerformance] =
+    useState<TrendingPerformanceResponse | null>(null);
+  const [searchTrends, setSearchTrends] =
+    useState<SearchTrendsResponse | null>(null);
+  const [feedEngagement, setFeedEngagement] =
+    useState<FeedEngagementResponse | null>(null);
+  const [jobsHealth, setJobsHealth] = useState<JobsHealthResponse | null>(null);
   const [recalculatingTrending, setRecalculatingTrending] = useState(false);
 
   // General state
@@ -317,6 +333,7 @@ const AdminAnalyticsPage: FC = () => {
     null
   );
   const chartExportRef = useRef<HTMLDivElement | null>(null);
+  const hasLoadedTrendingRef = useRef(false);
 
   useEffect(() => {
     if (user?.id && !targetUserId) {
@@ -412,34 +429,37 @@ const AdminAnalyticsPage: FC = () => {
         trendingPeriod?: TrendingPeriod;
       };
 
-      if (!searchParams.get('period') && parsed.timePeriod)
+      const initParams = initialSearchParamsRef.current;
+      if (!initParams.get('period') && parsed.timePeriod)
         setTimePeriod(parsed.timePeriod);
-      if (!searchParams.get('start') && parsed.customStartDate)
+      if (!initParams.get('start') && parsed.customStartDate)
         setCustomStartDate(parsed.customStartDate);
-      if (!searchParams.get('end') && parsed.customEndDate)
+      if (!initParams.get('end') && parsed.customEndDate)
         setCustomEndDate(parsed.customEndDate);
       if (parsed.metricVisibility)
-        setMetricVisibility((prev) => ({
-          ...prev,
-          ...parsed.metricVisibility,
-        }));
+        setMetricVisibility((prev) => {
+          const next = { ...prev, ...parsed.metricVisibility };
+          const hasChange = Object.keys(next).some((k) => next[k] !== prev[k]);
+          return hasChange ? next : prev;
+        });
       if (
-        !searchParams.get('auto') &&
+        !initParams.get('auto') &&
         typeof parsed.autoRefreshInterval === 'number'
       )
         setAutoRefreshInterval(parsed.autoRefreshInterval);
-      if (!searchParams.get('connChart') && parsed.connectionChartType)
+      if (!initParams.get('connChart') && parsed.connectionChartType)
         setConnectionChartType(parsed.connectionChartType);
-      if (!searchParams.get('refChart') && parsed.referralChartType)
+      if (!initParams.get('refChart') && parsed.referralChartType)
         setReferralChartType(parsed.referralChartType);
-      if (!searchParams.get('theme') && parsed.themePreference)
+      if (!initParams.get('theme') && parsed.themePreference)
         setThemePreference(parsed.themePreference);
-      if (!searchParams.get('trendPeriod') && parsed.trendingPeriod)
+      if (!initParams.get('trendPeriod') && parsed.trendingPeriod)
         setTrendingPeriod(parsed.trendingPeriod);
     } catch (err) {
       console.error('Failed to parse analytics filter preferences', err);
     }
-  }, [user?.id, searchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -780,15 +800,37 @@ const AdminAnalyticsPage: FC = () => {
 
   const loadTrendingAnalytics = useCallback(
     async (silent = false) => {
-      if (!silent) setLoading(true);
-      setError(null);
+      const shouldBlockUi = !silent && !hasLoadedTrendingRef.current;
+      if (shouldBlockUi) setLoading(true);
+      if (!silent) setError(null);
 
       try {
-        const response = await adminAnalyticsService.getTrendingPosts(
-          trendingPeriod,
-          20
-        );
-        setTrendingData(response.data);
+        const [trendingRes, perfRes, searchRes, feedRes, jobsRes] =
+          await Promise.allSettled([
+            adminAnalyticsService.getTrendingPosts(trendingPeriod, 20),
+            adminAnalyticsService.getTrendingPerformance(trendingPeriod),
+            adminAnalyticsService.getSearchTrends(adminAnalyticsParams),
+            adminAnalyticsService.getFeedEngagement(adminAnalyticsParams),
+            adminAnalyticsService.getJobsHealth(),
+          ]);
+
+        if (trendingRes.status === 'fulfilled') {
+          setTrendingData(trendingRes.value.data);
+          hasLoadedTrendingRef.current = true;
+        }
+        if (perfRes.status === 'fulfilled') {
+          setTrendingPerformance(perfRes.value.data);
+        }
+        if (searchRes.status === 'fulfilled') {
+          setSearchTrends(searchRes.value.data);
+        }
+        if (feedRes.status === 'fulfilled') {
+          setFeedEngagement(feedRes.value.data);
+        }
+        if (jobsRes.status === 'fulfilled') {
+          setJobsHealth(jobsRes.value.data);
+        }
+
         setLastUpdated(new Date());
       } catch (err) {
         console.error('Failed to load trending analytics', err);
@@ -796,10 +838,10 @@ const AdminAnalyticsPage: FC = () => {
           'Failed to load trending analytics. Ensure your admin token is valid and try again.'
         );
       } finally {
-        setLoading(false);
+        if (shouldBlockUi) setLoading(false);
       }
     },
-    [trendingPeriod]
+    [trendingPeriod, adminAnalyticsParams]
   );
 
   useEffect(() => {
@@ -1920,6 +1962,216 @@ const AdminAnalyticsPage: FC = () => {
                     ))
                   )}
                 </Stack>
+              </Paper>
+            ) : null}
+
+            {isMetricEnabled('trending.performance') ? (
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                  Trending Algorithm Performance
+                </Typography>
+                {trendingPerformance ? (
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Click Through Rate
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {(trendingPerformance.clickThroughRate * 100).toFixed(1)}%
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Avg Time Spent
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {trendingPerformance.avgTimeSpentSeconds.toFixed(1)}s
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Engagement Rate
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {(trendingPerformance.engagementRate * 100).toFixed(1)}%
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Cache Miss Rate
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{
+                          fontWeight: 800,
+                          color:
+                            trendingPerformance.cacheMissRate > 0.2
+                              ? 'warning.main'
+                              : 'success.main',
+                        }}
+                      >
+                        {(trendingPerformance.cacheMissRate * 100).toFixed(1)}%
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Alert severity="info">
+                    Performance metrics are not available yet.
+                  </Alert>
+                )}
+              </Paper>
+            ) : null}
+
+            {isMetricEnabled('trending.search') ? (
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                  Search Query Success Trends
+                </Typography>
+                {searchTrends ? (
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6} lg={4}>
+                      <Typography variant="overline" color="text.secondary">
+                        Total Searches
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {searchTrends.totalSearches}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={4}>
+                      <Typography variant="overline" color="text.secondary">
+                        Successful Searches
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {searchTrends.successfulSearches}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={4}>
+                      <Typography variant="overline" color="text.secondary">
+                        Success Rate
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {(searchTrends.successRate * 100).toFixed(1)}%
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Alert severity="info">Search trend metrics are not available yet.</Alert>
+                )}
+              </Paper>
+            ) : null}
+
+            {isMetricEnabled('trending.feed') ? (
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                  Feed Engagement Metrics
+                </Typography>
+                {feedEngagement ? (
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Feed CTR
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {(feedEngagement.feedClickThroughRate * 100).toFixed(1)}%
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Avg Scroll Depth
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {feedEngagement.avgScrollDepthPercent.toFixed(0)}%
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Avg Time on Feed
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                        {feedEngagement.avgTimeOnFeedSeconds.toFixed(1)}s
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} lg={3}>
+                      <Typography variant="overline" color="text.secondary">
+                        Job Queue Backlog
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{
+                          fontWeight: 800,
+                          color:
+                            feedEngagement.jobQueueBacklog > 100
+                              ? 'warning.main'
+                              : 'inherit',
+                        }}
+                      >
+                        {feedEngagement.jobQueueBacklog}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Alert severity="info">Feed engagement metrics are not available yet.</Alert>
+                )}
+              </Paper>
+            ) : null}
+
+            {isMetricEnabled('trending.jobs') ? (
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Queue Health Monitor
+                  </Typography>
+                  {jobsHealth ? (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        px: 1,
+                        py: 0.25,
+                        borderRadius: 1,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        bgcolor:
+                          jobsHealth.status === 'healthy'
+                            ? 'success.main'
+                            : jobsHealth.status === 'degraded'
+                              ? 'warning.main'
+                              : 'error.main',
+                        color: 'white',
+                      }}
+                    >
+                      {jobsHealth.status}
+                    </Typography>
+                  ) : null}
+                </Box>
+                {jobsHealth ? (
+                  <Grid container spacing={3}>
+                    {([['Export Queue', jobsHealth.exportQueue], ['Reports Queue', jobsHealth.reportsQueue]] as const).map(
+                      ([label, q]) => (
+                        <Grid item xs={12} md={6} key={label}>
+                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                            {label}
+                          </Typography>
+                          {q.error ? (
+                            <Typography variant="body2" color="error.main">
+                              {q.error}
+                            </Typography>
+                          ) : (
+                            <Stack spacing={0.5}>
+                              <Typography variant="body2" color="text.secondary">
+                                Waiting: <strong>{q.waiting ?? 0}</strong> | Active: <strong>{q.active ?? 0}</strong> | Failed: <strong>{q.failed ?? 0}</strong>
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Completed: <strong>{q.completed ?? 0}</strong> | Delayed: <strong>{q.delayed ?? 0}</strong> | Total: <strong>{q.total ?? 0}</strong>
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Grid>
+                      ),
+                    )}
+                  </Grid>
+                ) : (
+                  <Alert severity="info">Queue health data is not available yet.</Alert>
+                )}
               </Paper>
             ) : null}
           </Stack>
