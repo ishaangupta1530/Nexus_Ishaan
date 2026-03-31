@@ -248,20 +248,20 @@ const FeedPage: FC = () => {
     [showNotification]
   );
 
-    // Track feed session when user loads the feed
-    useEffect(() => {
-      if (!user?.id) return;
+  // Track feed session when user loads the feed
+  useEffect(() => {
+    if (!user?.id) return;
 
-      // Call feed session tracking on component mount
+    // Call feed session tracking on component mount
+    trackFeedSessionService();
+
+    // Also track periodically while user is viewing the feed (every 30 seconds)
+    const sessionTrackingInterval = setInterval(() => {
       trackFeedSessionService();
+    }, 30000);
 
-      // Also track periodically while user is viewing the feed (every 30 seconds)
-      const sessionTrackingInterval = setInterval(() => {
-        trackFeedSessionService();
-      }, 30000);
-
-      return () => clearInterval(sessionTrackingInterval);
-    }, [user?.id]);
+    return () => clearInterval(sessionTrackingInterval);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;

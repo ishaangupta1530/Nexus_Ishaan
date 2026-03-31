@@ -648,7 +648,7 @@ export class AdminAnalyticsService {
         select: { userId: true, createdAt: true, lastActivity: true },
       }),
       this.prisma.searchQuery.findMany({
-        where: { createdAt: { gte: range.startDate, lte: range.endDate } },
+        where: { createdAt: { gte: range.startDate, lte: range.endDate }, query: 'feed' },
         select: { clickedResults: true },
       }),
       this.queueService.healthCheck(),

@@ -1,97 +1,109 @@
 -- CreateTable algorithm_performance
 CREATE TABLE "algorithm_performance" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "metricType" TEXT NOT NULL,
     "executionTimeMs" INTEGER NOT NULL,
-    "cacheHitRate" REAL NOT NULL DEFAULT 0,
-    "cacheMissRate" REAL NOT NULL DEFAULT 0,
-    "clickThroughRate" REAL NOT NULL DEFAULT 0,
-    "engagementRate" REAL NOT NULL DEFAULT 0,
-    "conversionRate" REAL NOT NULL DEFAULT 0,
-    "timeSpentSeconds" REAL NOT NULL DEFAULT 0,
+    "cacheHitRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "cacheMissRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "clickThroughRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "engagementRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "conversionRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "timeSpentSeconds" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "anomalyDetected" BOOLEAN NOT NULL DEFAULT false,
     "anomalyType" TEXT,
-    "anomalyScore" REAL NOT NULL DEFAULT 0,
+    "anomalyScore" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "period" TEXT NOT NULL,
-    "recordedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadata" TEXT
+    "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metadata" JSONB,
+
+    CONSTRAINT "algorithm_performance_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable discovery_metrics
 CREATE TABLE "discovery_metrics" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "recommendationsSent" INTEGER NOT NULL DEFAULT 0,
     "recommendationsAccepted" INTEGER NOT NULL DEFAULT 0,
-    "acceptanceRate" REAL NOT NULL DEFAULT 0,
+    "acceptanceRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "searchQueries" INTEGER NOT NULL DEFAULT 0,
-    "searchSuccessRate" REAL NOT NULL DEFAULT 0,
-    "feedEngagementRate" REAL NOT NULL DEFAULT 0,
-    "scrollDepthPercent" REAL NOT NULL DEFAULT 0,
-    "returningVisitorRate" REAL NOT NULL DEFAULT 0,
+    "searchSuccessRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "feedEngagementRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "scrollDepthPercent" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "returningVisitorRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "period" TEXT NOT NULL,
-    "recordedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadata" TEXT
+    "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metadata" JSONB,
+
+    CONSTRAINT "discovery_metrics_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable system_health_alerts
 CREATE TABLE "system_health_alerts" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "alertType" TEXT NOT NULL,
     "severity" TEXT NOT NULL,
     "message" TEXT NOT NULL,
-    "threshold" REAL,
-    "currentValue" REAL,
-    "metadata" TEXT,
+    "threshold" DOUBLE PRECISION,
+    "currentValue" DOUBLE PRECISION,
+    "metadata" JSONB,
     "acknowledged" BOOLEAN NOT NULL DEFAULT false,
-    "acknowledgedAt" DATETIME,
+    "acknowledgedAt" TIMESTAMP(3),
     "acknowledgedBy" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "resolvedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "resolvedAt" TIMESTAMP(3),
+
+    CONSTRAINT "system_health_alerts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable queue_metrics
 CREATE TABLE "queue_metrics" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "queueName" TEXT NOT NULL,
     "waitingCount" INTEGER NOT NULL DEFAULT 0,
     "delayedCount" INTEGER NOT NULL DEFAULT 0,
     "completedCount" INTEGER NOT NULL DEFAULT 0,
     "failedCount" INTEGER NOT NULL DEFAULT 0,
-    "avgProcessTime" REAL NOT NULL DEFAULT 0,
+    "avgProcessTime" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "backlogHealth" TEXT NOT NULL,
     "period" TEXT NOT NULL,
-    "recordedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadata" TEXT
+    "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metadata" JSONB,
+
+    CONSTRAINT "queue_metrics_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable trending_score_logs
 CREATE TABLE "trending_score_logs" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "contentId" TEXT NOT NULL,
     "contentType" TEXT NOT NULL,
-    "score" REAL NOT NULL,
+    "score" DOUBLE PRECISION NOT NULL,
     "position" INTEGER NOT NULL,
     "userEngagements" INTEGER NOT NULL,
     "impressions" INTEGER NOT NULL,
-    "timeSpentSeconds" REAL NOT NULL DEFAULT 0,
+    "timeSpentSeconds" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "clickCount" INTEGER NOT NULL DEFAULT 0,
     "period" TEXT NOT NULL,
-    "calculatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "anomalyScore" REAL NOT NULL DEFAULT 0,
-    "isAnomaly" BOOLEAN NOT NULL DEFAULT false
+    "calculatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "anomalyScore" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "isAnomaly" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "trending_score_logs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable analytics_aggregations
 CREATE TABLE "analytics_aggregations" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "aggregationType" TEXT NOT NULL,
-    "metricsSnapshot" TEXT NOT NULL,
+    "metricsSnapshot" JSONB NOT NULL,
     "anomaliesCount" INTEGER NOT NULL DEFAULT 0,
     "alertsTriggered" INTEGER NOT NULL DEFAULT 0,
     "period" TEXT NOT NULL,
-    "startDate" DATETIME NOT NULL,
-    "endDate" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "analytics_aggregations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex

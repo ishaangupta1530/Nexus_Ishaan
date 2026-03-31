@@ -33,6 +33,7 @@ import { LegacyFilesService } from 'src/files/legacy-files.service';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { randomUUID } from 'crypto';
 
 /**
  * Controller for handling post-related operations.
@@ -417,8 +418,8 @@ export class PostController {
           await this.prisma.userSession.create({
             data: {
               userId,
-              sessionToken: `feed-session-${userId}-${Date.now()}`,
-              ipAddress: '0.0.0.0',
+              sessionToken: randomUUID(),
+              ipAddress: 'unknown',
               isActive: true,
               lastActivity: new Date(),
             },

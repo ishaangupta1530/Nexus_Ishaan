@@ -9,7 +9,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
 
 @Module({
-  imports: [PrismaModule, QueueModule, ScheduleModule.forRoot()],
+  imports: [PrismaModule, QueueModule, ScheduleModule],
   controllers: [AdminAnalyticsController, AnalyticsMonitoringController],
   providers: [AdminAnalyticsService, MonitoringService, MetricsSchedulerService],
   exports: [MonitoringService, AdminAnalyticsService],

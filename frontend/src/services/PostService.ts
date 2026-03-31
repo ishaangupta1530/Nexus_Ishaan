@@ -443,20 +443,21 @@ export async function trackFeedInteractionService(postId: string): Promise<void>
     console.debug(`Failed to track interaction for post ${postId}`);
   }
 }
-  /**
-   * Tracks a feed session (view) for analytics.
-   * This is called when users load/view the feed.
-   * Creates/updates UserSession for feed engagement time tracking.
-   */
-  export async function trackFeedSessionService(): Promise<void> {
-    try {
-      // Fire-and-forget: don't wait for response
-      api.post('/posts/feed-session/track').catch(() => {
-        // Silently fail - don't block user experience
-        console.debug('Failed to track feed session');
-      });
-    } catch {
-      // Silently fail at the try level too
+
+/**
+ * Tracks a feed session (view) for analytics.
+ * This is called when users load/view the feed.
+ * Creates/updates UserSession for feed engagement time tracking.
+ */
+export async function trackFeedSessionService(): Promise<void> {
+  try {
+    // Fire-and-forget: don't wait for response
+    api.post('/posts/feed-session/track').catch(() => {
+      // Silently fail - don't block user experience
       console.debug('Failed to track feed session');
-    }
+    });
+  } catch {
+    // Silently fail at the try level too
+    console.debug('Failed to track feed session');
   }
+}

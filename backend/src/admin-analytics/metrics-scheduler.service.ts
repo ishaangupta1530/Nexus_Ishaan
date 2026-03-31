@@ -118,7 +118,7 @@ export class MetricsSchedulerService {
   /**
    * Generate weekly digest of alerts every Monday at 8 AM
    */
-  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  @Cron('0 8 * * 1')
   async generateWeeklyAlertDigest() {
     this.logger.debug('Generating alert digest...');
     try {
